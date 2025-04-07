@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profitez - متجر إلكتروني</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">Profitez</div>
+            <div class="nav-links">
+                <a href="#" class="active">الرئيسية</a>
+                <a href="#products">المنتجات</a>
+                <a href="#" id="addProductBtn">إضافة منتج</a>
+                <a href="#" id="feedbackBtn">التواصل مع الدعم</a>
+                <a href="#" id="loginBtn">تسجيل الدخول</a>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <h1>مرحباً بكم في Profitez</h1>
+            <p>اكتشف أفضل المنتجات بأفضل الأسعار</p>
+        </section>
+
+        <section id="products" class="products">
+            <h2>المنتجات المتوفرة</h2>
+            <div class="products-grid" id="productsContainer">
+                <!-- Products will be added here dynamically -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Add Product Modal -->
+    <div id="addProductModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>إضافة منتج جديد</h2>
+            <form id="addProductForm">
+                <input type="text" id="productName" placeholder="اسم المنتج" required>
+                <input type="number" id="productPrice" placeholder="السعر" required>
+                <textarea id="productDescription" placeholder="وصف المنتج" required></textarea>
+                <input type="tel" id="productPhone" placeholder="رقم الهاتف" required>
+                <label for="productImage">صورة المنتج</label>
+                <input type="file" id="productImage" accept="image/*" required title="صورة المنتج">
+                <button type="submit">إضافة المنتج</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>تسجيل الدخول</h2>
+            <form id="loginForm">
+                <input type="email" id="email" placeholder="البريد الإلكتروني" required>
+                <input type="password" id="password" placeholder="كلمة المرور" required>
+                <button type="submit">تسجيل الدخول</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Subscription Plans Modal -->
+    <div id="subscriptionPlansModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>اختر خطة الاشتراك</h2>
+            <div class="subscription-plans">
+                <div class="plan" data-plan="free" data-limit="2" data-price="0">
+                    <h3>العرض المجاني</h3>
+                    <p>عرض من 1 إلى 2 منتج</p>
+                    <p class="price">مجاناً</p>
+                    <button class="select-plan">اختيار</button>
+                </div>
+                <div class="plan" data-plan="basic" data-limit="10" data-price="1000">
+                    <h3>العرض الأساسي</h3>
+                    <p>عرض من 3 إلى 10 منتج</p>
+                    <p class="price">1000 دج</p>
+                    <button class="select-plan">اختيار</button>
+                </div>
+                <div class="plan" data-plan="standard" data-limit="50" data-price="2000">
+                    <h3>العرض القياسي</h3>
+                    <p>عرض من 10 إلى 50 منتج</p>
+                    <p class="price">2000 دج</p>
+                    <button class="select-plan">اختيار</button>
+                </div>
+                <div class="plan" data-plan="premium" data-limit="100" data-price="4000">
+                    <h3>العرض المتميز</h3>
+                    <p>عرض من 50 إلى 100 منتج</p>
+                    <p class="price">4000 دج</p>
+                    <button class="select-plan">اختيار</button>
+                </div>
+                <div class="plan" data-plan="business" data-limit="300" data-price="5000">
+                    <h3>عرض الأعمال</h3>
+                    <p>عرض من 100 إلى 300 منتج</p>
+                    <p class="price">5000 دج</p>
+                    <button class="select-plan">اختيار</button>
+                </div>
+                <div class="plan" data-plan="enterprise" data-limit="500" data-price="6000">
+                    <h3>عرض المؤسسات</h3>
+                    <p>عرض من 300 إلى 500 منتج</p>
+                    <p class="price">6000 دج</p>
+                    <button class="select-plan">اختيار</button>
+                </div>
+                <div class="plan" data-plan="unlimited" data-limit="999999" data-price="10000">
+                    <h3>عرض غير محدود</h3>
+                    <p>عرض عدد غير محدود من المنتجات</p>
+                    <p class="price">10000 دج</p>
+                    <button class="select-plan">اختيار</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Instructions Modal -->
+    <div id="paymentInstructionsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>تعليمات الدفع</h2>
+            <div class="payment-instructions">
+                <p>ان علميه الدفع تكون بتحويل ثمن العرض الى رقم الحساب التالي "0000000000" و بعد التحويل سيعرض المشرف منتجاتك</p>
+                <div class="selected-plan-info">
+                    <p>الخطة المختارة: <span id="selectedPlanName"></span></p>
+                    <p>عدد المنتجات المسموح بها: <span id="selectedPlanLimit"></span></p>
+                    <p>مبلغ الدفع: <span id="selectedPlanPrice"></span> دج</p>
+                </div>
+                <button id="confirmPayment">تأكيد الدفع</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard Modal -->
+    <div id="adminDashboardModal" class="modal">
+        <div class="modal-content admin-dashboard">
+            <span class="close">&times;</span>
+            <h2>لوحة تحكم المشرف</h2>
+            <div class="admin-tabs">
+                <button class="tab-button active" data-tab="users">المستخدمين</button>
+                <button class="tab-button" data-tab="products">المنتجات</button>
+                <button class="tab-button" data-tab="feedback">التعليقات</button>
+            </div>
+            <div class="tab-content">
+                <div id="users-tab" class="tab-pane active">
+                    <div class="search-container">
+                        <input type="text" id="userSearch" placeholder="بحث عن مستخدم...">
+                    </div>
+                    <div class="users-list" id="usersList">
+                        <!-- Users will be added here dynamically -->
+                    </div>
+                </div>
+                <div id="products-tab" class="tab-pane">
+                    <div class="search-container">
+                        <input type="text" id="productSearch" placeholder="بحث عن منتج...">
+                    </div>
+                    <div class="products-list" id="adminProductsList">
+                        <!-- Products will be added here dynamically -->
+                    </div>
+                </div>
+                <div id="feedback-tab" class="tab-pane">
+                    <div class="search-container">
+                        <input type="text" id="feedbackSearch" placeholder="بحث في التعليقات...">
+                    </div>
+                    <div class="feedback-list" id="feedbackList">
+                        <!-- Feedback will be added here dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>إرسال تعليق للمشرف</h2>
+            <form id="feedbackForm">
+                <input type="text" id="feedbackSubject" placeholder="موضوع التعليق" required>
+                <textarea id="feedbackMessage" placeholder="اكتب تعليقك هنا..." required></textarea>
+                <button type="submit">إرسال التعليق</button>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <p>جميع الحقوق محفوظة &copy; 2025 Profitez</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html> 
