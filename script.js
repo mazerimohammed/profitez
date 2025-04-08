@@ -20,6 +20,7 @@ const feedbackList = document.getElementById('feedbackList');
 const userSearch = document.getElementById('userSearch');
 const productSearch = document.getElementById('productSearch');
 const feedbackSearch = document.getElementById('feedbackSearch');
+const mainProductSearch = document.getElementById('mainProductSearch');
 const tabButtons = document.querySelectorAll('.tab-button');
 
 // Sample data structure for products
@@ -83,6 +84,7 @@ addProductBtn.addEventListener('click', () => {
         addProductModal.style.display = 'block';
     } else {
         // Customer needs to select a subscription plan
+        updateSubscriptionPlansDisplay(); // Update plans with current product count
         subscriptionPlansModal.style.display = 'block';
     }
 });
@@ -223,6 +225,32 @@ document.querySelectorAll('.select-plan').forEach(button => {
     });
 });
 
+// Function to update subscription plans display with current product count
+function updateSubscriptionPlansDisplay() {
+    if (!currentUser) return;
+    
+    const userProducts = products.filter(p => p.seller === currentUser.email);
+    const currentProductCount = userProducts.length;
+    const currentPlan = currentUser.subscriptionPlan || { limit: 2, name: 'العرض المجاني' };
+    
+    // Update each plan display with current product count
+    document.querySelectorAll('.plan').forEach(planElement => {
+        const planType = planElement.dataset.plan;
+        const planLimit = parseInt(planElement.dataset.limit);
+        
+        // Add current product count info to each plan
+        const planInfo = planElement.querySelector('p');
+        if (planInfo) {
+            // Check if this is the current plan
+            if (planType === currentPlan.plan) {
+                planInfo.innerHTML = `عرض من ${currentProductCount} إلى ${planLimit} منتج (خطتك الحالية)`;
+            } else {
+                planInfo.innerHTML = `عرض من ${currentProductCount} إلى ${planLimit} منتج`;
+            }
+        }
+    });
+}
+
 // Handle payment confirmation
 confirmPaymentBtn.addEventListener('click', () => {
     if (selectedPlan) {
@@ -239,11 +267,22 @@ confirmPaymentBtn.addEventListener('click', () => {
             saveData();
         }
         
+        // Update current user's subscription plan
+        currentUser.subscriptionPlan = selectedPlan;
+        
         // Close payment modal and show add product modal
         paymentInstructionsModal.style.display = 'none';
-        addProductModal.style.display = 'block';
         
-        alert(`تم تأكيد الدفع للخطة: ${selectedPlan.name}. يمكنك الآن إضافة منتجاتك.`);
+        // Calculate remaining product slots
+        const userProducts = products.filter(p => p.seller === currentUser.email);
+        const remainingSlots = selectedPlan.limit - userProducts.length;
+        
+        if (remainingSlots > 0) {
+            alert(`تم تأكيد الدفع للخطة: ${selectedPlan.name}. يمكنك الآن إضافة ${remainingSlots} منتج${remainingSlots > 1 ? 'ات' : ''}.`);
+            addProductModal.style.display = 'block';
+        } else {
+            alert(`تم تأكيد الدفع للخطة: ${selectedPlan.name}. لقد وصلت بالفعل إلى الحد الأقصى من المنتجات المسموح بها في هذه الخطة.`);
+        }
     }
 });
 
@@ -316,6 +355,7 @@ addProductForm.addEventListener('submit', (e) => {
     
     const productName = document.getElementById('productName').value;
     const productPrice = document.getElementById('productPrice').value;
+    const productCategory = document.getElementById('productCategory').value;
     const productDescription = document.getElementById('productDescription').value;
     const productPhone = document.getElementById('productPhone').value;
     const productImage = document.getElementById('productImage').files[0];
@@ -338,6 +378,7 @@ addProductForm.addEventListener('submit', (e) => {
         if (productIndex !== -1) {
             products[productIndex].name = productName;
             products[productIndex].price = productPrice;
+            products[productIndex].category = productCategory;
             products[productIndex].description = productDescription;
             products[productIndex].phone = productPhone;
             
@@ -354,6 +395,7 @@ addProductForm.addEventListener('submit', (e) => {
             id: Date.now(),
             name: productName,
             price: productPrice,
+            category: productCategory,
             description: productDescription,
             phone: productPhone,
             image: URL.createObjectURL(productImage),
@@ -363,7 +405,21 @@ addProductForm.addEventListener('submit', (e) => {
 
         products.push(newProduct);
         saveData(); // Save products to localStorage
-        alert('تم إضافة المنتج بنجاح');
+        
+        // Check if user has reached their limit after adding a product
+        if (currentUser.role === 'customer') {
+            const userProducts = products.filter(p => p.seller === currentUser.email);
+            const userSubscriptionPlan = currentUser.subscriptionPlan || { limit: 2 };
+            
+            if (userProducts.length >= userSubscriptionPlan.limit) {
+                alert(`تم إضافة المنتج بنجاح! لقد وصلت إلى الحد الأقصى من المنتجات المسموح بها في خطتك الحالية (${userSubscriptionPlan.limit} منتج). إذا كنت ترغب في إضافة المزيد من المنتجات، يرجى ترقية خطتك.`);
+            } else {
+                const remainingProducts = userSubscriptionPlan.limit - userProducts.length;
+                alert(`تم إضافة المنتج بنجاح! يمكنك إضافة ${remainingProducts} منتج${remainingProducts > 1 ? 'ات' : ''} أخرى في خطتك الحالية.`);
+            }
+        } else {
+            alert('تم إضافة المنتج بنجاح');
+        }
     }
     
     addProductModal.style.display = 'none';
@@ -381,6 +437,7 @@ function editProduct(productId) {
         // Fill the form with product data
         document.getElementById('productName').value = product.name;
         document.getElementById('productPrice').value = product.price;
+        document.getElementById('productCategory').value = product.category || '';
         document.getElementById('productDescription').value = product.description;
         document.getElementById('productPhone').value = product.phone;
         
@@ -405,20 +462,54 @@ function deleteProduct(productId) {
     }
 }
 
+// Add event listener for main product search
+mainProductSearch.addEventListener('input', () => {
+    displayProducts();
+});
+
 // Function to display products
 function displayProducts() {
     productsContainer.innerHTML = '';
     
-    products.forEach(product => {
+    // Get search query from main product search
+    const searchQuery = mainProductSearch.value.toLowerCase();
+    
+    // Filter products based on search query
+    const filteredProducts = products.filter(product => 
+        (product.status === 'approved' || currentUser?.role === 'admin') &&
+        (product.name.toLowerCase().includes(searchQuery) || 
+         product.description.toLowerCase().includes(searchQuery) ||
+         (product.category && product.category.toLowerCase().includes(searchQuery)))
+    );
+    
+    filteredProducts.forEach(product => {
         if (product.status === 'approved' || currentUser?.role === 'admin') {
             const productCard = document.createElement('div');
             productCard.className = 'product-card';
+            
+            // Get category display name
+            let categoryDisplay = '';
+            if (product.category) {
+                switch(product.category) {
+                    case 'electronics': categoryDisplay = 'إلكترونيات'; break;
+                    case 'clothing': categoryDisplay = 'ملابس'; break;
+                    case 'home': categoryDisplay = 'منتجات منزلية'; break;
+                    case 'beauty': categoryDisplay = 'مستحضرات تجميل'; break;
+                    case 'sports': categoryDisplay = 'رياضة'; break;
+                    case 'books': categoryDisplay = 'كتب'; break;
+                    case 'toys': categoryDisplay = 'ألعاب'; break;
+                    case 'food': categoryDisplay = 'طعام'; break;
+                    case 'other': categoryDisplay = 'أخرى'; break;
+                    default: categoryDisplay = product.category;
+                }
+            }
             
             productCard.innerHTML = `
                 <img src="${product.image}" alt="${product.name}" class="product-image">
                 <div class="product-info">
                     <h3 class="product-name">${product.name}</h3>
                     <p class="product-price">${product.price} دج</p>
+                    ${product.category ? `<p class="product-category">الفئة: ${categoryDisplay}</p>` : ''}
                     <p>${product.description}</p>
                     <p class="product-phone">رقم الهاتف: ${product.phone}</p>
                     ${currentUser?.role === 'admin' ? `
@@ -438,6 +529,17 @@ function displayProducts() {
             productsContainer.appendChild(productCard);
         }
     });
+    
+    // Show message if no products found
+    if (filteredProducts.length === 0) {
+        const noProductsMessage = document.createElement('div');
+        noProductsMessage.className = 'no-products-message';
+        noProductsMessage.innerHTML = `
+            <p>لم يتم العثور على منتجات تطابق بحثك.</p>
+            <p>جرب استخدام كلمات بحث مختلفة.</p>
+        `;
+        productsContainer.appendChild(noProductsMessage);
+    }
 }
 
 // Function to approve products (admin only)
@@ -526,17 +628,36 @@ function displayAdminProducts() {
     const filteredProducts = products.filter(product => 
         product.name.toLowerCase().includes(searchQuery) || 
         product.description.toLowerCase().includes(searchQuery) ||
-        product.seller.toLowerCase().includes(searchQuery)
+        product.seller.toLowerCase().includes(searchQuery) ||
+        (product.category && product.category.toLowerCase().includes(searchQuery))
     );
     
     filteredProducts.forEach(product => {
         const productCard = document.createElement('div');
         productCard.className = 'admin-product-card';
         
+        // Get category display name
+        let categoryDisplay = '';
+        if (product.category) {
+            switch(product.category) {
+                case 'electronics': categoryDisplay = 'إلكترونيات'; break;
+                case 'clothing': categoryDisplay = 'ملابس'; break;
+                case 'home': categoryDisplay = 'منتجات منزلية'; break;
+                case 'beauty': categoryDisplay = 'مستحضرات تجميل'; break;
+                case 'sports': categoryDisplay = 'رياضة'; break;
+                case 'books': categoryDisplay = 'كتب'; break;
+                case 'toys': categoryDisplay = 'ألعاب'; break;
+                case 'food': categoryDisplay = 'طعام'; break;
+                case 'other': categoryDisplay = 'أخرى'; break;
+                default: categoryDisplay = product.category;
+            }
+        }
+        
         productCard.innerHTML = `
             <h3>${product.name}</h3>
             <div class="product-info">
                 <p>السعر: ${product.price} دج</p>
+                ${product.category ? `<p>الفئة: ${categoryDisplay}</p>` : ''}
                 <p>الوصف: ${product.description}</p>
                 <p>رقم الهاتف: ${product.phone}</p>
                 <p>البائع: ${product.seller}</p>
@@ -740,6 +861,9 @@ function updateUI() {
                 currentUser = null;
                 updateUI();
             };
+            
+            // Display subscription status for customers
+            displaySubscriptionStatus();
         }
     } else {
         loginBtn.textContent = 'تسجيل الدخول';
@@ -748,6 +872,53 @@ function updateUI() {
         };
     }
     displayProducts();
+}
+
+// Function to display subscription status for customers
+function displaySubscriptionStatus() {
+    if (!currentUser || currentUser.role === 'admin') return;
+    
+    // Get user's products count
+    const userProducts = products.filter(p => p.seller === currentUser.email);
+    const productCount = userProducts.length;
+    
+    // Get subscription plan
+    const subscriptionPlan = currentUser.subscriptionPlan || { limit: 2, name: 'العرض المجاني' };
+    const remainingSlots = subscriptionPlan.limit - productCount;
+    
+    // Create or update subscription status element
+    let statusElement = document.getElementById('subscriptionStatus');
+    if (!statusElement) {
+        statusElement = document.createElement('div');
+        statusElement.id = 'subscriptionStatus';
+        statusElement.className = 'subscription-status';
+        
+        // Insert after the hero section
+        const heroSection = document.querySelector('.hero');
+        heroSection.parentNode.insertBefore(statusElement, heroSection.nextSibling);
+    }
+    
+    // Update status content
+    statusElement.innerHTML = `
+        <div class="subscription-info">
+            <h3>حالة اشتراكك</h3>
+            <p>الخطة الحالية: <strong>${subscriptionPlan.name}</strong></p>
+            <p>المنتجات المضافة: <strong>${productCount}</strong> من <strong>${subscriptionPlan.limit}</strong></p>
+            <p>المنتجات المتبقية: <strong>${remainingSlots}</strong></p>
+            ${remainingSlots <= 0 ? `
+                <button id="upgradePlanBtn" class="upgrade-plan-btn">ترقية الخطة</button>
+            ` : ''}
+        </div>
+    `;
+    
+    // Add event listener to upgrade button if it exists
+    const upgradeBtn = document.getElementById('upgradePlanBtn');
+    if (upgradeBtn) {
+        upgradeBtn.addEventListener('click', () => {
+            updateSubscriptionPlansDisplay();
+            subscriptionPlansModal.style.display = 'block';
+        });
+    }
 }
 
 // Initial UI update

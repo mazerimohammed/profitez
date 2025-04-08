@@ -29,6 +29,9 @@
 
         <section id="products" class="products">
             <h2>المنتجات المتوفرة</h2>
+            <div class="search-container">
+                <input type="text" id="mainProductSearch" placeholder="ابحث عن منتج...">
+            </div>
             <div class="products-grid" id="productsContainer">
                 <!-- Products will be added here dynamically -->
             </div>
@@ -43,6 +46,19 @@
             <form id="addProductForm">
                 <input type="text" id="productName" placeholder="اسم المنتج" required>
                 <input type="number" id="productPrice" placeholder="السعر" required>
+                <label for="productCategory">فئة المنتج</label>
+                <select id="productCategory" aria-label="فئة المنتج" required>
+                    <option value="" disabled selected>اختر فئة المنتج</option>
+                    <option value="electronics">إلكترونيات</option>
+                    <option value="clothing">ملابس</option>
+                    <option value="home">منتجات منزلية</option>
+                    <option value="beauty">مستحضرات تجميل</option>
+                    <option value="sports">رياضة</option>
+                    <option value="books">كتب</option>
+                    <option value="toys">ألعاب</option>
+                    <option value="food">طعام</option>
+                    <option value="other">أخرى</option>
+                </select>
                 <textarea id="productDescription" placeholder="وصف المنتج" required></textarea>
                 <input type="tel" id="productPhone" placeholder="رقم الهاتف" required>
                 <label for="productImage">صورة المنتج</label>
