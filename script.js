@@ -247,42 +247,8 @@ confirmPaymentBtn.addEventListener('click', () => {
     }
 });
 
-// Function to verify email using Abstract API
-async function verifyEmail(email) {
-    const apiKey = 'YOUR_API_KEY'; // Replace with your Abstract API key
-    const url = `https://emailverification.abstractapi.com/v1/?api_key=${apiKey}&email=${email}`;
-    
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        // Check if email is deliverable and not disposable
-        return {
-            isValid: data.deliverability === 'DELIVERABLE' && !data.is_disposable_email,
-            message: getEmailValidationMessage(data)
-        };
-    } catch (error) {
-        console.error('Error verifying email:', error);
-        return {
-            isValid: false,
-            message: 'حدث خطأ أثناء التحقق من البريد الإلكتروني. يرجى المحاولة مرة أخرى.'
-        };
-    }
-}
-
-// Function to get validation message in Arabic
-function getEmailValidationMessage(data) {
-    if (data.deliverability !== 'DELIVERABLE') {
-        return 'هذا البريد الإلكتروني غير صالح أو غير موجود.';
-    }
-    if (data.is_disposable_email) {
-        return 'لا يمكن استخدام بريد إلكتروني مؤقت. يرجى استخدام بريد إلكتروني حقيقي.';
-    }
-    return 'البريد الإلكتروني صالح.';
-}
-
-// Update login form submission to include email verification
-loginForm.addEventListener('submit', async (e) => {
+// Handle login form submission
+loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
@@ -291,65 +257,51 @@ loginForm.addEventListener('submit', async (e) => {
     if (email === adminCredentials.email && password === adminCredentials.password) {
         currentUser = { role: 'admin', email };
         alert('تم تسجيل الدخول كمشرف بنجاح');
-        loginModal.style.display = 'none';
-        updateUI();
-        return;
-    }
-
-    // Check if user is already registered
-    const existingUser = registeredUsers.find(user => user.email === email);
-    
-    if (existingUser) {
-        // User exists, check password
-        if (existingUser.password === password) {
-            currentUser = { 
-                role: existingUser.role || 'customer', 
-                email,
-                subscriptionPlan: existingUser.subscriptionPlan || null,
-                hasUsedFreePlan: existingUser.hasUsedFreePlan || false
-            };
-            alert('تم تسجيل الدخول بنجاح');
-            loginModal.style.display = 'none';
-            updateUI();
-        } else {
-            alert('كلمة المرور غير صحيحة');
-        }
     } else {
-        // New user registration - verify email first
-        if (!isValidEmail(email)) {
-            alert('صيغة البريد الإلكتروني غير صحيحة. يرجى إدخال بريد إلكتروني صحيح.');
-            return;
-        }
-
-        // Show loading message
-        alert('جاري التحقق من البريد الإلكتروني...');
+        // Check if user is already registered
+        const existingUser = registeredUsers.find(user => user.email === email);
         
-        // Verify email
-        const verification = await verifyEmail(email);
-        if (!verification.isValid) {
-            alert(verification.message);
-            return;
+        if (existingUser) {
+            // User exists, check password
+            if (existingUser.password === password) {
+                currentUser = { 
+                    role: existingUser.role || 'customer', 
+                    email,
+                    subscriptionPlan: existingUser.subscriptionPlan || null,
+                    hasUsedFreePlan: existingUser.hasUsedFreePlan || false
+                };
+                alert('تم تسجيل الدخول بنجاح');
+            } else {
+                alert('كلمة المرور غير صحيحة');
+                return;
+            }
+        } else {
+            // Check if email is valid
+            if (!isValidEmail(email)) {
+                alert('البريد الإلكتروني غير صالح. يرجى إدخال بريد إلكتروني صحيح.');
+                return;
+            }
+            
+            // New user registration
+            const newUser = { 
+                email, 
+                password,
+                role: 'customer',
+                hasUsedFreePlan: false
+            };
+            registeredUsers.push(newUser);
+            saveData();
+            currentUser = { 
+                role: 'customer', 
+                email,
+                hasUsedFreePlan: false
+            };
+            alert('تم تسجيل حساب جديد بنجاح');
         }
-
-        // Email is valid, proceed with registration
-        const newUser = { 
-            email, 
-            password,
-            role: 'customer',
-            hasUsedFreePlan: false,
-            status: 'active'
-        };
-        registeredUsers.push(newUser);
-        saveData();
-        currentUser = { 
-            role: 'customer', 
-            email,
-            hasUsedFreePlan: false
-        };
-        alert('تم التحقق من البريد الإلكتروني وتسجيل الحساب بنجاح');
-        loginModal.style.display = 'none';
-        updateUI();
     }
+
+    loginModal.style.display = 'none';
+    updateUI();
 });
 
 // Function to validate email format
