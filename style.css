@@ -765,4 +765,203 @@ footer {
     .modal-content {
         padding: 1.5rem;
     }
+}
+
+/* Responsive Design */
+@media screen and (max-width: 768px) {
+    /* Navigation */
+    nav {
+        flex-direction: column;
+        padding: 1rem;
+    }
+
+    .nav-links {
+        flex-direction: column;
+        width: 100%;
+        margin-top: 1rem;
+    }
+
+    .nav-links a {
+        margin: 0.5rem 0;
+        text-align: center;
+        padding: 0.5rem;
+    }
+
+    /* Hero Section */
+    .hero {
+        padding: 2rem 1rem;
+    }
+
+    .hero h1 {
+        font-size: 1.8rem;
+    }
+
+    .hero p {
+        font-size: 1rem;
+    }
+
+    /* Products Grid */
+    .products-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    /* Modals */
+    .modal-content {
+        width: 95%;
+        margin: 5% auto;
+        padding: 1rem;
+    }
+
+    .subscription-plans {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    /* Admin Dashboard */
+    .admin-dashboard {
+        width: 95% !important;
+        padding: 1rem;
+    }
+
+    .admin-tabs {
+        flex-wrap: wrap;
+    }
+
+    .tab-button {
+        flex: 1 1 50%;
+        padding: 0.5rem;
+    }
+
+    .user-card, .admin-product-card, .feedback-card {
+        padding: 1rem;
+    }
+
+    .user-actions, .product-actions, .feedback-actions {
+        flex-direction: column;
+    }
+
+    .user-actions button, .product-actions button, .feedback-actions button {
+        width: 100%;
+        margin: 0.25rem 0;
+    }
+
+    /* Forms */
+    form {
+        padding: 1rem;
+    }
+
+    input, textarea {
+        width: 100%;
+    }
+}
+
+/* Tablet Styles */
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .subscription-plans {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .modal-content {
+        width: 80%;
+    }
+}
+
+/* Small Mobile Devices */
+@media screen and (max-width: 480px) {
+    .hero h1 {
+        font-size: 1.5rem;
+    }
+
+    .product-card {
+        margin: 0.5rem;
+    }
+
+    .modal-content {
+        padding: 0.8rem;
+    }
+
+    .tab-button {
+        font-size: 0.9rem;
+    }
+}
+
+/* Landscape Mode */
+@media screen and (max-height: 500px) and (orientation: landscape) {
+    .modal-content {
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .users-list, .products-list, .feedback-list {
+        max-height: 60vh;
+    }
+}
+
+/* High-DPI Screens */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .product-image {
+        image-rendering: -webkit-optimize-contrast;
+    }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) {
+    .product-card:hover {
+        transform: none;
+    }
+
+    .nav-links a:hover {
+        background-color: var(--primary-lighter);
+    }
+
+    button {
+        padding: 0.8rem 1.2rem;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-color: #9c27b0;
+        --primary-light: #d1c4e9;
+        --primary-lighter: #ede7f6;
+        --primary-dark: #6a1b9a;
+        --secondary-color: #121212;
+        --text-color: #ffffff;
+        --text-light: #b0b0b0;
+        --white: #1e1e1e;
+    }
+
+    body {
+        background-color: var(--secondary-color);
+        color: var(--text-color);
+    }
+
+    .product-card, .user-card, .admin-product-card, .feedback-card {
+        background-color: var(--white);
+    }
+
+    input, textarea {
+        background-color: var(--secondary-color);
+        color: var(--text-color);
+        border-color: var(--primary-lighter);
+    }
+}
+
+/* Print Styles */
+@media print {
+    .nav-links, .modal, button {
+        display: none !important;
+    }
+
+    .product-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
 } 
