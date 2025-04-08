@@ -23,6 +23,16 @@ const feedbackSearch = document.getElementById('feedbackSearch');
 const mainProductSearch = document.getElementById('mainProductSearch');
 const tabButtons = document.querySelectorAll('.tab-button');
 
+// Sidebar Navigation
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+const closeSidebar = document.getElementById('closeSidebar');
+const overlay = document.getElementById('overlay');
+const sidebarLinks = document.querySelectorAll('.sidebar-links a');
+const sidebarAddProductBtn = document.getElementById('sidebarAddProductBtn');
+const sidebarFeedbackBtn = document.getElementById('sidebarFeedbackBtn');
+const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
+
 // Sample data structure for products
 let products = [];
 let currentUser = null;
@@ -920,6 +930,70 @@ function displaySubscriptionStatus() {
         });
     }
 }
+
+// Toggle sidebar
+menuToggle.addEventListener('click', () => {
+    sidebar.classList.add('active');
+    overlay.classList.add('active');
+    document.body.classList.add('sidebar-open');
+    document.body.style.overflow = 'hidden';
+});
+
+// Close sidebar
+function closeSidebarMenu() {
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-open');
+    document.body.style.overflow = '';
+}
+
+closeSidebar.addEventListener('click', closeSidebarMenu);
+overlay.addEventListener('click', closeSidebarMenu);
+
+// Handle sidebar links
+sidebarLinks.forEach(link => {
+    link.addEventListener('click', () => {
+        // Remove active class from all links
+        sidebarLinks.forEach(l => l.classList.remove('active'));
+        // Add active class to clicked link
+        link.classList.add('active');
+        // Close sidebar after clicking a link
+        closeSidebarMenu();
+    });
+});
+
+// Connect sidebar buttons to main buttons
+sidebarAddProductBtn.addEventListener('click', () => {
+    document.getElementById('addProductBtn').click();
+});
+
+sidebarFeedbackBtn.addEventListener('click', () => {
+    document.getElementById('feedbackBtn').click();
+});
+
+sidebarLoginBtn.addEventListener('click', () => {
+    document.getElementById('loginBtn').click();
+});
+
+// Update active link based on current page
+function updateActiveLink() {
+    const currentPath = window.location.pathname;
+    const currentHash = window.location.hash;
+    
+    sidebarLinks.forEach(link => {
+        const linkHref = link.getAttribute('href');
+        if (linkHref === currentPath || (linkHref === '#' && currentPath === '/') || 
+            (linkHref === currentHash && currentHash !== '')) {
+            link.classList.add('active');
+        } else {
+            link.classList.remove('active');
+        }
+    });
+}
+
+// Call updateActiveLink on page load and when hash changes
+updateActiveLink();
+window.addEventListener('hashchange', updateActiveLink);
 
 // Initial UI update
 updateUI(); 

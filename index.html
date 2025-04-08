@@ -10,6 +10,11 @@
 <body>
     <header>
         <nav>
+            <div class="menu-toggle" id="menuToggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
             <div class="logo">Profitez</div>
             <div class="nav-links">
                 <a href="#" class="active">الرئيسية</a>
@@ -20,6 +25,23 @@
             </div>
         </nav>
     </header>
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">Profitez</div>
+            <div class="close-sidebar" id="closeSidebar">&times;</div>
+        </div>
+        <div class="sidebar-links">
+            <a href="#" class="active">الرئيسية</a>
+            <a href="#products">المنتجات</a>
+            <a href="#" id="sidebarAddProductBtn">إضافة منتج</a>
+            <a href="#" id="sidebarFeedbackBtn">التواصل مع الدعم</a>
+            <a href="#" id="sidebarLoginBtn">تسجيل الدخول</a>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
 
     <main>
         <section class="hero">
