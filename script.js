@@ -47,40 +47,8 @@ const adminCredentials = {
     password: '2005060hh'
 };
 
-// Load saved data from Firebase
-async function loadSavedData() {
-    try {
-        // Load products from Firestore
-        const productsSnapshot = await firebaseDb.collection('products').get();
-        products = [];
-        productsSnapshot.forEach(doc => {
-            products.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Load registered users from Firestore
-        const usersSnapshot = await firebaseDb.collection('users').get();
-        registeredUsers = [];
-        usersSnapshot.forEach(doc => {
-            registeredUsers.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Load feedbacks from Firestore
-        const feedbacksSnapshot = await firebaseDb.collection('feedbacks').get();
-        feedbacks = [];
-        feedbacksSnapshot.forEach(doc => {
-            feedbacks.push({ id: doc.id, ...doc.data() });
-        });
-        
-        console.log("Data loaded from Firebase successfully");
-    } catch (error) {
-        console.error("Error loading data from Firebase:", error);
-        // Fallback to localStorage if Firebase fails
-        loadFromLocalStorage();
-    }
-}
-
-// Fallback to localStorage
-function loadFromLocalStorage() {
+// Load saved data from localStorage
+function loadSavedData() {
     // Load products
     const savedProducts = localStorage.getItem('products');
     if (savedProducts) {
@@ -100,66 +68,15 @@ function loadFromLocalStorage() {
     }
 }
 
-// Save data to Firebase
-async function saveData() {
-    try {
-        // Save products to Firestore
-        for (const product of products) {
-            const { id, ...productData } = product;
-            if (id) {
-                await firebaseDb.collection('products').doc(id).set(productData);
-            } else {
-                const newProductRef = await firebaseDb.collection('products').add(productData);
-                product.id = newProductRef.id;
-            }
-        }
-        
-        // Save users to Firestore
-        for (const user of registeredUsers) {
-            const { id, ...userData } = user;
-            if (id) {
-                await firebaseDb.collection('users').doc(id).set(userData);
-            } else {
-                const newUserRef = await firebaseDb.collection('users').add(userData);
-                user.id = newUserRef.id;
-            }
-        }
-        
-        // Save feedbacks to Firestore
-        for (const feedback of feedbacks) {
-            const { id, ...feedbackData } = feedback;
-            if (id) {
-                await firebaseDb.collection('feedbacks').doc(id).set(feedbackData);
-            } else {
-                const newFeedbackRef = await firebaseDb.collection('feedbacks').add(feedbackData);
-                feedback.id = newFeedbackRef.id;
-            }
-        }
-        
-        console.log("Data saved to Firebase successfully");
-    } catch (error) {
-        console.error("Error saving data to Firebase:", error);
-        // Fallback to localStorage if Firebase fails
-        saveToLocalStorage();
-    }
-}
-
-// Fallback to localStorage
-function saveToLocalStorage() {
+// Save data to localStorage
+function saveData() {
     localStorage.setItem('products', JSON.stringify(products));
     localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers));
     localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
 }
 
 // Load data when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    // Check if Firebase is initialized
-    if (window.firebaseApp) {
-        loadSavedData();
-    } else {
-        loadFromLocalStorage();
-    }
-});
+loadSavedData();
 
 // Event Listeners
 addProductBtn.addEventListener('click', () => {
@@ -380,227 +297,179 @@ confirmPaymentBtn.addEventListener('click', () => {
 });
 
 // Handle login form submission
-loginForm.addEventListener('submit', async (e) => {
+loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    
-    try {
-        // Check if it's admin login
-        if (email === adminCredentials.email && password === adminCredentials.password) {
-            currentUser = { email, isAdmin: true };
-            loginModal.style.display = 'none';
-            adminDashboardModal.style.display = 'block';
-            displayUsers();
-            displayAdminProducts();
-            displayFeedbacks();
-            return;
-        }
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    // Check if credentials match admin credentials
+    if (email === adminCredentials.email && password === adminCredentials.password) {
+        currentUser = { role: 'admin', email };
+        alert('تم تسجيل الدخول كمشرف بنجاح');
+    } else {
+        // Check if user is already registered
+        const existingUser = registeredUsers.find(user => user.email === email);
         
-        // Try to sign in with Firebase
-        const userCredential = await firebaseAuth.signInWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Get user data from Firestore
-        const userDoc = await firebaseDb.collection('users').doc(user.uid).get();
-        const userData = userDoc.data();
-        
-        currentUser = {
-            id: user.uid,
-            email: user.email,
-            isAdmin: false,
-            ...userData
-        };
-        
-        loginModal.style.display = 'none';
-        alert('تم تسجيل الدخول بنجاح');
-    } catch (error) {
-        console.error("Login error:", error);
-        if (error.code === 'auth/user-not-found') {
-            alert('البريد الإلكتروني غير مسجل');
-        } else if (error.code === 'auth/wrong-password') {
-            alert('كلمة المرور غير صحيحة');
+        if (existingUser) {
+            // User exists, check password
+            if (existingUser.password === password) {
+                currentUser = { 
+                    role: existingUser.role || 'customer', 
+                    email,
+                    subscriptionPlan: existingUser.subscriptionPlan || null,
+                    hasUsedFreePlan: existingUser.hasUsedFreePlan || false
+                };
+                alert('تم تسجيل الدخول بنجاح');
+            } else {
+                alert('كلمة المرور غير صحيحة');
+                return;
+            }
         } else {
-            alert('حدث خطأ أثناء تسجيل الدخول');
+            // Check if email is valid
+            if (!isValidEmail(email)) {
+                alert('البريد الإلكتروني غير صالح. يرجى إدخال بريد إلكتروني صحيح.');
+                return;
+            }
+            
+            // New user registration
+            const newUser = { 
+                email, 
+                password,
+                role: 'customer',
+                hasUsedFreePlan: false
+            };
+            registeredUsers.push(newUser);
+            saveData();
+            currentUser = { 
+                role: 'customer', 
+                email,
+                hasUsedFreePlan: false
+            };
+            alert('تم تسجيل حساب جديد بنجاح');
         }
     }
+
+    loginModal.style.display = 'none';
+    updateUI();
 });
 
-// Handle registration
-async function registerUser(email, password) {
-    try {
-        // Check if email already exists
-        const existingUser = registeredUsers.find(user => user.email === email);
-        if (existingUser) {
-            alert('البريد الإلكتروني مسجل بالفعل');
-            return false;
-        }
-        
-        // Create user in Firebase Auth
-        const userCredential = await firebaseAuth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Create user document in Firestore
-        const newUser = {
-            email: email,
-            isAdmin: false,
-            createdAt: new Date().toISOString()
-        };
-        
-        await firebaseDb.collection('users').doc(user.uid).set(newUser);
-        
-        // Add to local array
-        registeredUsers.push({
-            id: user.uid,
-            ...newUser
-        });
-        
-        // Save to Firebase
-        await saveData();
-        
-        alert('تم تسجيل حساب جديد بنجاح');
-        return true;
-    } catch (error) {
-        console.error("Registration error:", error);
-        if (error.code === 'auth/email-already-in-use') {
-            alert('البريد الإلكتروني مسجل بالفعل');
-        } else if (error.code === 'auth/invalid-email') {
-            alert('البريد الإلكتروني غير صالح');
-        } else if (error.code === 'auth/weak-password') {
-            alert('كلمة المرور ضعيفة جداً');
-        } else {
-            alert('حدث خطأ أثناء التسجيل');
-        }
-        return false;
-    }
+// Function to validate email format
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
 }
 
-// Handle logout
-async function logout() {
-    try {
-        await firebaseAuth.signOut();
-        currentUser = null;
-        adminDashboardModal.style.display = 'none';
-        alert('تم تسجيل الخروج بنجاح');
-    } catch (error) {
-        console.error("Logout error:", error);
-        alert('حدث خطأ أثناء تسجيل الخروج');
-    }
-}
-
-// Handle product form submission
-addProductForm.addEventListener('submit', async (e) => {
+// Handle add product form submission
+addProductForm.addEventListener('submit', (e) => {
     e.preventDefault();
     
     const productName = document.getElementById('productName').value;
-    const productDescription = document.getElementById('productDescription').value;
     const productPrice = document.getElementById('productPrice').value;
     const productCategory = document.getElementById('productCategory').value;
-    const productImage = document.getElementById('productImage').value;
-    
-    try {
-        if (editingProductId) {
-            // Update existing product
-            const productRef = firebaseDb.collection('products').doc(editingProductId);
-            await productRef.update({
-                name: productName,
-                description: productDescription,
-                price: parseFloat(productPrice),
-                category: productCategory,
-                image: productImage,
-                updatedAt: new Date().toISOString()
-            });
+    const productDescription = document.getElementById('productDescription').value;
+    const productPhone = document.getElementById('productPhone').value;
+    const productImage = document.getElementById('productImage').files[0];
+
+    // Check if customer has reached their product limit
+    if (currentUser.role === 'customer') {
+        const userProducts = products.filter(p => p.seller === currentUser.email);
+        const userSubscriptionPlan = currentUser.subscriptionPlan || { limit: 2 }; // Default to free plan
+        
+        if (userProducts.length >= userSubscriptionPlan.limit) {
+            alert(`لقد وصلت إلى الحد الأقصى من المنتجات المسموح بها في خطتك الحالية (${userSubscriptionPlan.limit} منتج). يرجى ترقية خطتك لإضافة المزيد من المنتجات.`);
+            subscriptionPlansModal.style.display = 'block';
+            return;
+        }
+    }
+
+    if (editingProductId) {
+        // Update existing product
+        const productIndex = products.findIndex(p => p.id === editingProductId);
+        if (productIndex !== -1) {
+            products[productIndex].name = productName;
+            products[productIndex].price = productPrice;
+            products[productIndex].category = productCategory;
+            products[productIndex].description = productDescription;
+            products[productIndex].phone = productPhone;
             
-            // Update local array
-            const productIndex = products.findIndex(p => p.id === editingProductId);
-            if (productIndex !== -1) {
-                products[productIndex] = {
-                    ...products[productIndex],
-                    name: productName,
-                    description: productDescription,
-                    price: parseFloat(productPrice),
-                    category: productCategory,
-                    image: productImage
-                };
+            if (productImage) {
+                products[productIndex].image = URL.createObjectURL(productImage);
             }
             
+            saveData();
             alert('تم تحديث المنتج بنجاح');
+        }
+    } else {
+        // Create new product object
+        const newProduct = {
+            id: Date.now(),
+            name: productName,
+            price: productPrice,
+            category: productCategory,
+            description: productDescription,
+            phone: productPhone,
+            image: URL.createObjectURL(productImage),
+            status: currentUser.role === 'admin' ? 'approved' : 'pending',
+            seller: currentUser.email
+        };
+
+        products.push(newProduct);
+        saveData(); // Save products to localStorage
+        
+        // Check if user has reached their limit after adding a product
+        if (currentUser.role === 'customer') {
+            const userProducts = products.filter(p => p.seller === currentUser.email);
+            const userSubscriptionPlan = currentUser.subscriptionPlan || { limit: 2 };
+            
+            if (userProducts.length >= userSubscriptionPlan.limit) {
+                alert(`تم إضافة المنتج بنجاح! لقد وصلت إلى الحد الأقصى من المنتجات المسموح بها في خطتك الحالية (${userSubscriptionPlan.limit} منتج). إذا كنت ترغب في إضافة المزيد من المنتجات، يرجى ترقية خطتك.`);
+            } else {
+                const remainingProducts = userSubscriptionPlan.limit - userProducts.length;
+                alert(`تم إضافة المنتج بنجاح! يمكنك إضافة ${remainingProducts} منتج${remainingProducts > 1 ? 'ات' : ''} أخرى في خطتك الحالية.`);
+            }
         } else {
-            // Create new product
-            const newProduct = {
-                name: productName,
-                description: productDescription,
-                price: parseFloat(productPrice),
-                category: productCategory,
-                image: productImage,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-            
-            // Add to Firestore
-            const docRef = await firebaseDb.collection('products').add(newProduct);
-            
-            // Add to local array
-            products.push({
-                id: docRef.id,
-                ...newProduct
-            });
-            
             alert('تم إضافة المنتج بنجاح');
         }
-        
-        // Reset form and close modal
-        addProductForm.reset();
-        addProductModal.style.display = 'none';
-        editingProductId = null;
-        
-        // Update displays
-        displayProducts();
-        if (currentUser?.isAdmin) {
-            displayAdminProducts();
-        }
-    } catch (error) {
-        console.error("Product submission error:", error);
-        alert('حدث خطأ أثناء حفظ المنتج');
-    }
-});
-
-// Delete product
-async function deleteProduct(productId) {
-    if (!confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
-        return;
     }
     
-    try {
-        // Delete from Firestore
-        await firebaseDb.collection('products').doc(productId).delete();
+    addProductModal.style.display = 'none';
+    addProductForm.reset();
+    editingProductId = null;
+    displayProducts();
+});
+
+// Function to edit a product
+function editProduct(productId) {
+    const product = products.find(p => p.id === productId);
+    if (product) {
+        editingProductId = productId;
         
-        // Delete from local array
-        products = products.filter(p => p.id !== productId);
+        // Fill the form with product data
+        document.getElementById('productName').value = product.name;
+        document.getElementById('productPrice').value = product.price;
+        document.getElementById('productCategory').value = product.category || '';
+        document.getElementById('productDescription').value = product.description;
+        document.getElementById('productPhone').value = product.phone;
         
-        alert('تم حذف المنتج بنجاح');
-        displayProducts();
-        displayAdminProducts();
-    } catch (error) {
-        console.error("Product deletion error:", error);
-        alert('حدث خطأ أثناء حذف المنتج');
+        // Update modal title
+        document.querySelector('#addProductModal h2').textContent = 'تعديل المنتج';
+        
+        // Show the modal
+        addProductModal.style.display = 'block';
     }
 }
 
-// Edit product
-function editProduct(productId) {
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-    
-    editingProductId = productId;
-    document.getElementById('productName').value = product.name;
-    document.getElementById('productDescription').value = product.description;
-    document.getElementById('productPrice').value = product.price;
-    document.getElementById('productCategory').value = product.category;
-    document.getElementById('productImage').value = product.image;
-    
-    addProductModal.style.display = 'block';
+// Function to delete a product
+function deleteProduct(productId) {
+    if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
+        const productIndex = products.findIndex(p => p.id === productId);
+        if (productIndex !== -1) {
+            products.splice(productIndex, 1);
+            saveData();
+            displayProducts();
+            alert('تم حذف المنتج بنجاح');
+        }
+    }
 }
 
 // Add event listener for main product search
@@ -608,95 +477,92 @@ mainProductSearch.addEventListener('input', () => {
     displayProducts();
 });
 
-// Display products in the main page
-async function displayProducts() {
-    try {
-        // Get products from Firestore
-        const productsSnapshot = await firebaseDb.collection('products').get();
-        products = productsSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-        
-        const productsContainer = document.getElementById('productsContainer');
-        productsContainer.innerHTML = '';
-        
-        products.forEach(product => {
+// Function to display products
+function displayProducts() {
+    productsContainer.innerHTML = '';
+    
+    // Get search query from main product search
+    const searchQuery = mainProductSearch.value.toLowerCase();
+    
+    // Filter products based on search query
+    const filteredProducts = products.filter(product => 
+        (product.status === 'approved' || currentUser?.role === 'admin') &&
+        (product.name.toLowerCase().includes(searchQuery) || 
+         product.description.toLowerCase().includes(searchQuery) ||
+         (product.category && product.category.toLowerCase().includes(searchQuery)))
+    );
+    
+    filteredProducts.forEach(product => {
+        if (product.status === 'approved' || currentUser?.role === 'admin') {
             const productCard = document.createElement('div');
             productCard.className = 'product-card';
+            
+            // Get category display name
+            let categoryDisplay = '';
+            if (product.category) {
+                switch(product.category) {
+                    case 'electronics': categoryDisplay = 'إلكترونيات'; break;
+                    case 'clothing': categoryDisplay = 'ملابس'; break;
+                    case 'home': categoryDisplay = 'منتجات منزلية'; break;
+                    case 'beauty': categoryDisplay = 'مستحضرات تجميل'; break;
+                    case 'sports': categoryDisplay = 'رياضة'; break;
+                    case 'books': categoryDisplay = 'كتب'; break;
+                    case 'toys': categoryDisplay = 'ألعاب'; break;
+                    case 'food': categoryDisplay = 'طعام'; break;
+                    case 'other': categoryDisplay = 'أخرى'; break;
+                    default: categoryDisplay = product.category;
+                }
+            }
+            
             productCard.innerHTML = `
-                <img src="${product.image}" alt="${product.name}">
-                <h3>${product.name}</h3>
-                <p>${product.description}</p>
-                <p class="price">${product.price} ريال</p>
-                <p class="category">${getCategoryInArabic(product.category)}</p>
-                ${currentUser ? `
-                    <button onclick="addToCart('${product.id}')" class="add-to-cart-btn">
-                        إضافة إلى السلة
-                    </button>
-                ` : ''}
-            `;
-            productsContainer.appendChild(productCard);
-        });
-    } catch (error) {
-        console.error("Error displaying products:", error);
-        alert('حدث خطأ أثناء عرض المنتجات');
-    }
-}
-
-// Display products in admin dashboard
-async function displayAdminProducts() {
-    try {
-        const adminProductsContainer = document.getElementById('adminProductsContainer');
-        adminProductsContainer.innerHTML = '';
-        
-        const searchQuery = document.getElementById('adminProductSearch').value.toLowerCase();
-        const filteredProducts = products.filter(product => 
-            product.name.toLowerCase().includes(searchQuery) ||
-            product.description.toLowerCase().includes(searchQuery) ||
-            getCategoryInArabic(product.category).toLowerCase().includes(searchQuery)
-        );
-        
-        filteredProducts.forEach(product => {
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card admin-product-card';
-            productCard.innerHTML = `
-                <img src="${product.image}" alt="${product.name}">
-                <h3>${product.name}</h3>
-                <p>${product.description}</p>
-                <p class="price">${product.price} ريال</p>
-                <p class="category">${getCategoryInArabic(product.category)}</p>
-                <div class="product-actions">
-                    <button onclick="editProduct('${product.id}')" class="edit-btn">
-                        تعديل
-                    </button>
-                    <button onclick="deleteProduct('${product.id}')" class="delete-btn">
-                        حذف
-                    </button>
+                <img src="${product.image}" alt="${product.name}" class="product-image">
+                <div class="product-info">
+                    <h3 class="product-name">${product.name}</h3>
+                    <p class="product-price">${product.price} دج</p>
+                    ${product.category ? `<p class="product-category">الفئة: ${categoryDisplay}</p>` : ''}
+                    <p>${product.description}</p>
+                    <p class="product-phone">رقم الهاتف: ${product.phone}</p>
+                    ${currentUser?.role === 'admin' ? `
+                        <p>الحالة: ${product.status === 'approved' ? 'معتمد' : 'قيد الانتظار'}</p>
+                        <p>البائع: ${product.seller}</p>
+                        <div class="admin-actions">
+                            ${product.status === 'pending' ? `
+                                <button onclick="approveProduct(${product.id})">اعتماد المنتج</button>
+                            ` : ''}
+                            <button onclick="editProduct(${product.id})">تعديل</button>
+                            <button onclick="deleteProduct(${product.id})">حذف</button>
+                        </div>
+                    ` : ''}
                 </div>
             `;
-            adminProductsContainer.appendChild(productCard);
-        });
-    } catch (error) {
-        console.error("Error displaying admin products:", error);
-        alert('حدث خطأ أثناء عرض المنتجات في لوحة التحكم');
+            
+            productsContainer.appendChild(productCard);
+        }
+    });
+    
+    // Show message if no products found
+    if (filteredProducts.length === 0) {
+        const noProductsMessage = document.createElement('div');
+        noProductsMessage.className = 'no-products-message';
+        noProductsMessage.innerHTML = `
+            <p>لم يتم العثور على منتجات تطابق بحثك.</p>
+            <p>جرب استخدام كلمات بحث مختلفة.</p>
+        `;
+        productsContainer.appendChild(noProductsMessage);
     }
 }
 
-// Helper function to get category name in Arabic
-function getCategoryInArabic(category) {
-    const categories = {
-        'Electronics': 'إلكترونيات',
-        'Clothing': 'ملابس',
-        'Home': 'المنزل',
-        'Beauty': 'الجمال',
-        'Sports': 'الرياضة',
-        'Books': 'الكتب',
-        'Toys': 'الألعاب',
-        'Food': 'الطعام',
-        'Other': 'أخرى'
-    };
-    return categories[category] || category;
+// Function to approve products (admin only)
+function approveProduct(productId) {
+    if (currentUser?.role === 'admin') {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+            product.status = 'approved';
+            saveData(); // Save changes to localStorage
+            displayProducts();
+            alert('تم اعتماد المنتج بنجاح');
+        }
+    }
 }
 
 // Function to display users in admin dashboard
@@ -760,6 +626,63 @@ function displayUsers() {
         `;
         
         usersList.appendChild(userCard);
+    });
+}
+
+// Function to display all products in admin dashboard
+function displayAdminProducts() {
+    adminProductsList.innerHTML = '';
+    
+    // Filter products based on search query
+    const searchQuery = productSearch.value.toLowerCase();
+    const filteredProducts = products.filter(product => 
+        product.name.toLowerCase().includes(searchQuery) || 
+        product.description.toLowerCase().includes(searchQuery) ||
+        product.seller.toLowerCase().includes(searchQuery) ||
+        (product.category && product.category.toLowerCase().includes(searchQuery))
+    );
+    
+    filteredProducts.forEach(product => {
+        const productCard = document.createElement('div');
+        productCard.className = 'admin-product-card';
+        
+        // Get category display name
+        let categoryDisplay = '';
+        if (product.category) {
+            switch(product.category) {
+                case 'electronics': categoryDisplay = 'إلكترونيات'; break;
+                case 'clothing': categoryDisplay = 'ملابس'; break;
+                case 'home': categoryDisplay = 'منتجات منزلية'; break;
+                case 'beauty': categoryDisplay = 'مستحضرات تجميل'; break;
+                case 'sports': categoryDisplay = 'رياضة'; break;
+                case 'books': categoryDisplay = 'كتب'; break;
+                case 'toys': categoryDisplay = 'ألعاب'; break;
+                case 'food': categoryDisplay = 'طعام'; break;
+                case 'other': categoryDisplay = 'أخرى'; break;
+                default: categoryDisplay = product.category;
+            }
+        }
+        
+        productCard.innerHTML = `
+            <h3>${product.name}</h3>
+            <div class="product-info">
+                <p>السعر: ${product.price} دج</p>
+                ${product.category ? `<p>الفئة: ${categoryDisplay}</p>` : ''}
+                <p>الوصف: ${product.description}</p>
+                <p>رقم الهاتف: ${product.phone}</p>
+                <p>البائع: ${product.seller}</p>
+                <p>الحالة: ${product.status === 'approved' ? 'معتمد' : 'قيد الانتظار'}</p>
+            </div>
+            <div class="product-actions">
+                ${product.status === 'pending' ? `
+                    <button onclick="approveProduct(${product.id})">اعتماد</button>
+                ` : ''}
+                <button onclick="editProduct(${product.id})">تعديل</button>
+                <button onclick="deleteProduct(${product.id})">حذف</button>
+            </div>
+        `;
+        
+        adminProductsList.appendChild(productCard);
     });
 }
 
@@ -1073,4 +996,150 @@ updateActiveLink();
 window.addEventListener('hashchange', updateActiveLink);
 
 // Initial UI update
-updateUI(); 
+updateUI();
+
+// تحديث وظيفة حفظ المنتجات
+function saveProducts() {
+    const productsRef = dbRef(db, 'products');
+    dbSet(productsRef, products);
+}
+
+// تحديث وظيفة تحميل المنتجات
+function loadProducts() {
+    const productsRef = dbRef(db, 'products');
+    dbOnValue(productsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            products = data;
+            displayProducts();
+            displayAdminProducts();
+        }
+    });
+}
+
+// تحديث وظيفة حفظ المستخدمين
+function saveUsers() {
+    const usersRef = dbRef(db, 'users');
+    dbSet(usersRef, users);
+}
+
+// تحديث وظيفة تحميل المستخدمين
+function loadUsers() {
+    const usersRef = dbRef(db, 'users');
+    dbOnValue(usersRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            users = data;
+            displayUsers();
+        }
+    });
+}
+
+// تحديث وظيفة حفظ التعليقات
+function saveFeedback() {
+    const feedbackRef = dbRef(db, 'feedback');
+    dbSet(feedbackRef, feedback);
+}
+
+// تحديث وظيفة تحميل التعليقات
+function loadFeedback() {
+    const feedbackRef = dbRef(db, 'feedback');
+    dbOnValue(feedbackRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            feedback = data;
+            displayFeedback();
+        }
+    });
+}
+
+// تحديث وظيفة إضافة منتج جديد
+document.getElementById('addProductForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const productName = document.getElementById('productName').value;
+    const productPrice = document.getElementById('productPrice').value;
+    const productCategory = document.getElementById('productCategory').value;
+    const productDescription = document.getElementById('productDescription').value;
+    const productPhone = document.getElementById('productPhone').value;
+    const productImage = document.getElementById('productImage').files[0];
+
+    // إنشاء معرف فريد للمنتج
+    const newProductRef = dbPush(dbRef(db, 'products'));
+    const productId = newProductRef.key;
+
+    // إنشاء كائن المنتج
+    const newProduct = {
+        id: productId,
+        name: productName,
+        price: productPrice,
+        category: productCategory,
+        description: productDescription,
+        phone: productPhone,
+        image: productImage ? URL.createObjectURL(productImage) : 'default-product.jpg',
+        date: new Date().toISOString()
+    };
+
+    // حفظ المنتج في Firebase
+    dbSet(newProductRef, newProduct);
+
+    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
+    document.getElementById('addProductModal').style.display = 'none';
+    this.reset();
+});
+
+// تحديث وظيفة إرسال التعليق
+document.getElementById('feedbackForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const subject = document.getElementById('feedbackSubject').value;
+    const message = document.getElementById('feedbackMessage').value;
+
+    // إنشاء معرف فريد للتعليق
+    const newFeedbackRef = dbPush(dbRef(db, 'feedback'));
+    const feedbackId = newFeedbackRef.key;
+
+    // إنشاء كائن التعليق
+    const newFeedback = {
+        id: feedbackId,
+        subject: subject,
+        message: message,
+        date: new Date().toISOString(),
+        status: 'pending'
+    };
+
+    // حفظ التعليق في Firebase
+    dbSet(newFeedbackRef, newFeedback);
+
+    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
+    document.getElementById('feedbackModal').style.display = 'none';
+    this.reset();
+});
+
+// تحديث وظيفة تسجيل الدخول
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    // إنشاء معرف فريد للمستخدم
+    const newUserRef = dbPush(dbRef(db, 'users'));
+    const userId = newUserRef.key;
+
+    // إنشاء كائن المستخدم
+    const newUser = {
+        id: userId,
+        email: email,
+        password: password, // في التطبيق الحقيقي، يجب تشفير كلمة المرور
+        date: new Date().toISOString(),
+        role: 'user'
+    };
+
+    // حفظ المستخدم في Firebase
+    dbSet(newUserRef, newUser);
+
+    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
+    document.getElementById('loginModal').style.display = 'none';
+    this.reset();
+}); 
