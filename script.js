@@ -360,7 +360,7 @@ function isValidEmail(email) {
 }
 
 // Handle add product form submission
-addProductForm.addEventListener('submit', (e) => {
+addProductForm.addEventListener('submit', function(e) {
     e.preventDefault();
     
     const productName = document.getElementById('productName').value;
@@ -368,74 +368,30 @@ addProductForm.addEventListener('submit', (e) => {
     const productCategory = document.getElementById('productCategory').value;
     const productDescription = document.getElementById('productDescription').value;
     const productPhone = document.getElementById('productPhone').value;
-    const productImage = document.getElementById('productImage').files[0];
+    const productImageUrl = document.getElementById('productImageUrl').value;
 
-    // Check if customer has reached their product limit
-    if (currentUser.role === 'customer') {
-        const userProducts = products.filter(p => p.seller === currentUser.email);
-        const userSubscriptionPlan = currentUser.subscriptionPlan || { limit: 2 }; // Default to free plan
-        
-        if (userProducts.length >= userSubscriptionPlan.limit) {
-            alert(`لقد وصلت إلى الحد الأقصى من المنتجات المسموح بها في خطتك الحالية (${userSubscriptionPlan.limit} منتج). يرجى ترقية خطتك لإضافة المزيد من المنتجات.`);
-            subscriptionPlansModal.style.display = 'block';
-            return;
-        }
-    }
+    // إنشاء معرف فريد للمنتج
+    const newProductRef = dbPush(dbRef(db, 'products'));
+    const productId = newProductRef.key;
 
-    if (editingProductId) {
-        // Update existing product
-        const productIndex = products.findIndex(p => p.id === editingProductId);
-        if (productIndex !== -1) {
-            products[productIndex].name = productName;
-            products[productIndex].price = productPrice;
-            products[productIndex].category = productCategory;
-            products[productIndex].description = productDescription;
-            products[productIndex].phone = productPhone;
-            
-            if (productImage) {
-                products[productIndex].image = URL.createObjectURL(productImage);
-            }
-            
-            saveData();
-            alert('تم تحديث المنتج بنجاح');
-        }
-    } else {
-        // Create new product object
-        const newProduct = {
-            id: Date.now(),
-            name: productName,
-            price: productPrice,
-            category: productCategory,
-            description: productDescription,
-            phone: productPhone,
-            image: URL.createObjectURL(productImage),
-            status: currentUser.role === 'admin' ? 'approved' : 'pending',
-            seller: currentUser.email
-        };
+    // إنشاء كائن المنتج
+    const newProduct = {
+        id: productId,
+        name: productName,
+        price: productPrice,
+        category: productCategory,
+        description: productDescription,
+        phone: productPhone,
+        imageUrl: productImageUrl,
+        date: new Date().toISOString()
+    };
 
-        products.push(newProduct);
-        saveData(); // Save products to localStorage
-        
-        // Check if user has reached their limit after adding a product
-        if (currentUser.role === 'customer') {
-            const userProducts = products.filter(p => p.seller === currentUser.email);
-            const userSubscriptionPlan = currentUser.subscriptionPlan || { limit: 2 };
-            
-            if (userProducts.length >= userSubscriptionPlan.limit) {
-                alert(`تم إضافة المنتج بنجاح! لقد وصلت إلى الحد الأقصى من المنتجات المسموح بها في خطتك الحالية (${userSubscriptionPlan.limit} منتج). إذا كنت ترغب في إضافة المزيد من المنتجات، يرجى ترقية خطتك.`);
-            } else {
-                const remainingProducts = userSubscriptionPlan.limit - userProducts.length;
-                alert(`تم إضافة المنتج بنجاح! يمكنك إضافة ${remainingProducts} منتج${remainingProducts > 1 ? 'ات' : ''} أخرى في خطتك الحالية.`);
-            }
-        } else {
-            alert('تم إضافة المنتج بنجاح');
-        }
-    }
-    
-    addProductModal.style.display = 'none';
-    addProductForm.reset();
-    editingProductId = null;
-    displayProducts();
+    // حفظ المنتج في Firebase
+    dbSet(newProductRef, newProduct);
+
+    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
+    document.getElementById('addProductModal').style.display = 'none';
+    this.reset();
 });
 
 // Function to edit a product
@@ -479,77 +435,66 @@ mainProductSearch.addEventListener('input', () => {
 
 // Function to display products
 function displayProducts() {
+    const productsContainer = document.getElementById('productsContainer');
     productsContainer.innerHTML = '';
+
+    // الحصول على مرجع المنتجات من Firebase
+    const productsRef = dbRef(db, 'products');
     
-    // Get search query from main product search
-    const searchQuery = mainProductSearch.value.toLowerCase();
-    
-    // Filter products based on search query
-    const filteredProducts = products.filter(product => 
-        (product.status === 'approved' || currentUser?.role === 'admin') &&
-        (product.name.toLowerCase().includes(searchQuery) || 
-         product.description.toLowerCase().includes(searchQuery) ||
-         (product.category && product.category.toLowerCase().includes(searchQuery)))
-    );
-    
-    filteredProducts.forEach(product => {
-        if (product.status === 'approved' || currentUser?.role === 'admin') {
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card';
+    // استماع للتغييرات في قاعدة البيانات
+    dbOnValue(productsRef, (snapshot) => {
+        productsContainer.innerHTML = ''; // مسح المحتوى الحالي
+        
+        const data = snapshot.val();
+        if (data) {
+            // تحويل البيانات إلى مصفوفة
+            const productsArray = Object.values(data);
             
-            // Get category display name
-            let categoryDisplay = '';
-            if (product.category) {
-                switch(product.category) {
-                    case 'electronics': categoryDisplay = 'إلكترونيات'; break;
-                    case 'clothing': categoryDisplay = 'ملابس'; break;
-                    case 'home': categoryDisplay = 'منتجات منزلية'; break;
-                    case 'beauty': categoryDisplay = 'مستحضرات تجميل'; break;
-                    case 'sports': categoryDisplay = 'رياضة'; break;
-                    case 'books': categoryDisplay = 'كتب'; break;
-                    case 'toys': categoryDisplay = 'ألعاب'; break;
-                    case 'food': categoryDisplay = 'طعام'; break;
-                    case 'other': categoryDisplay = 'أخرى'; break;
-                    default: categoryDisplay = product.category;
-                }
-            }
+            // ترتيب المنتجات حسب التاريخ (الأحدث أولاً)
+            productsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
             
-            productCard.innerHTML = `
-                <img src="${product.image}" alt="${product.name}" class="product-image">
-                <div class="product-info">
-                    <h3 class="product-name">${product.name}</h3>
-                    <p class="product-price">${product.price} دج</p>
-                    ${product.category ? `<p class="product-category">الفئة: ${categoryDisplay}</p>` : ''}
-                    <p>${product.description}</p>
-                    <p class="product-phone">رقم الهاتف: ${product.phone}</p>
-                    ${currentUser?.role === 'admin' ? `
-                        <p>الحالة: ${product.status === 'approved' ? 'معتمد' : 'قيد الانتظار'}</p>
-                        <p>البائع: ${product.seller}</p>
-                        <div class="admin-actions">
-                            ${product.status === 'pending' ? `
-                                <button onclick="approveProduct(${product.id})">اعتماد المنتج</button>
-                            ` : ''}
-                            <button onclick="editProduct(${product.id})">تعديل</button>
-                            <button onclick="deleteProduct(${product.id})">حذف</button>
-                        </div>
-                    ` : ''}
+            // عرض كل منتج
+            productsArray.forEach(product => {
+                const productCard = document.createElement('div');
+                productCard.className = 'product-card';
+                productCard.innerHTML = `
+                    <img src="${product.imageUrl}" alt="${product.name}" class="product-image" onerror="this.src='https://via.placeholder.com/300x200?text=صورة+غير+متوفرة'">
+                    <div class="product-info">
+                        <h3 class="product-name">${product.name}</h3>
+                        <p class="product-price">${product.price} دج</p>
+                        <p class="product-category">${getCategoryName(product.category)}</p>
+                        <p class="product-description">${product.description}</p>
+                        <p class="product-phone">رقم الهاتف: ${product.phone}</p>
+                        <p class="product-date">تاريخ الإضافة: ${new Date(product.date).toLocaleDateString('ar-EG')}</p>
+                    </div>
+                `;
+                productsContainer.appendChild(productCard);
+            });
+        } else {
+            // عرض رسالة إذا لم تكن هناك منتجات
+            productsContainer.innerHTML = `
+                <div class="no-products-message">
+                    <p>لا توجد منتجات متاحة حالياً</p>
                 </div>
             `;
-            
-            productsContainer.appendChild(productCard);
         }
     });
-    
-    // Show message if no products found
-    if (filteredProducts.length === 0) {
-        const noProductsMessage = document.createElement('div');
-        noProductsMessage.className = 'no-products-message';
-        noProductsMessage.innerHTML = `
-            <p>لم يتم العثور على منتجات تطابق بحثك.</p>
-            <p>جرب استخدام كلمات بحث مختلفة.</p>
-        `;
-        productsContainer.appendChild(noProductsMessage);
-    }
+}
+
+// دالة مساعدة لتحويل رمز الفئة إلى اسمها بالعربية
+function getCategoryName(category) {
+    const categories = {
+        'electronics': 'إلكترونيات',
+        'clothing': 'ملابس',
+        'home': 'منتجات منزلية',
+        'beauty': 'مستحضرات تجميل',
+        'sports': 'رياضة',
+        'books': 'كتب',
+        'toys': 'ألعاب',
+        'food': 'طعام',
+        'other': 'أخرى'
+    };
+    return categories[category] || category;
 }
 
 // Function to approve products (admin only)
@@ -1062,7 +1007,7 @@ document.getElementById('addProductForm').addEventListener('submit', function(e)
     const productCategory = document.getElementById('productCategory').value;
     const productDescription = document.getElementById('productDescription').value;
     const productPhone = document.getElementById('productPhone').value;
-    const productImage = document.getElementById('productImage').files[0];
+    const productImageUrl = document.getElementById('productImageUrl').value;
 
     // إنشاء معرف فريد للمنتج
     const newProductRef = dbPush(dbRef(db, 'products'));
@@ -1076,7 +1021,7 @@ document.getElementById('addProductForm').addEventListener('submit', function(e)
         category: productCategory,
         description: productDescription,
         phone: productPhone,
-        image: productImage ? URL.createObjectURL(productImage) : 'default-product.jpg',
+        imageUrl: productImageUrl,
         date: new Date().toISOString()
     };
 
@@ -1142,4 +1087,30 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
     document.getElementById('loginModal').style.display = 'none';
     this.reset();
+});
+
+// تحديث وظيفة البحث عن المنتجات
+document.getElementById('mainProductSearch').addEventListener('input', function(e) {
+    const searchQuery = e.target.value.toLowerCase();
+    const productsContainer = document.getElementById('productsContainer');
+    const productCards = productsContainer.getElementsByClassName('product-card');
+
+    Array.from(productCards).forEach(card => {
+        const productName = card.querySelector('.product-name').textContent.toLowerCase();
+        const productDescription = card.querySelector('.product-description').textContent.toLowerCase();
+        const productCategory = card.querySelector('.product-category').textContent.toLowerCase();
+
+        if (productName.includes(searchQuery) || 
+            productDescription.includes(searchQuery) || 
+            productCategory.includes(searchQuery)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+});
+
+// استدعاء وظيفة عرض المنتجات عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', () => {
+    displayProducts();
 }); 
