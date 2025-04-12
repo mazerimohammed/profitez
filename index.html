@@ -83,8 +83,15 @@
                 </select>
                 <textarea id="productDescription" placeholder="وصف المنتج" required></textarea>
                 <input type="tel" id="productPhone" placeholder="رقم الهاتف" required>
-                <input type="url" id="productImageUrl" placeholder="رابط صورة المنتج" required>
-                <button type="submit">إضافة المنتج</button>
+                <div class="image-upload-container">
+                    <label for="productImage" class="image-upload-label">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>اختر صورة المنتج</span>
+                    </label>
+                    <input type="file" id="productImage" accept="image/*" required>
+                    <div id="imagePreview" class="image-preview"></div>
+                </div>
+                <button type="submit" id="submitProductBtn">إضافة المنتج</button>
             </form>
         </div>
     </div>
@@ -228,19 +235,21 @@
     </footer>
 
     <script src="script.js"></script>
+    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
 </body>
 <script type="module">
     // Import the functions you need from the SDKs you need
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-analytics.js";
     import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+    import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
     
     // Your web app's Firebase configuration
     const firebaseConfig = {
         apiKey: "AIzaSyBCPYWSeQ5JnJs9yOfo2vpqNhiDpxgM-tQ",
         authDomain: "turnkey-cooler-456322-f6.firebaseapp.com",
         projectId: "turnkey-cooler-456322-f6",
-        storageBucket: "turnkey-cooler-456322-f6.firebasestorage.app",
+        storageBucket: "turnkey-cooler-456322-f6.appspot.com",
         messagingSenderId: "634999350618",
         appId: "1:634999350618:web:093ffbb3df59efb36fff63",
         measurementId: "G-1SDKYMPG20",
@@ -251,13 +260,18 @@
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
     const database = getDatabase(app);
+    const storage = getStorage(app);
 
-    // Make database available globally
+    // Make database and storage available globally
     window.db = database;
     window.dbRef = ref;
     window.dbSet = set;
     window.dbPush = push;
     window.dbOnValue = onValue;
     window.dbRemove = remove;
+    window.storage = storage;
+    window.storageRef = storageRef;
+    window.uploadBytes = uploadBytes;
+    window.getDownloadURL = getDownloadURL;
 </script>
 </html> 

@@ -43,9 +43,18 @@ let editingProductId = null;
 
 // Admin credentials
 const adminCredentials = {
-    email: 'mohammedmazeri6@gmail.com',
-    password: '2005060hh'
+    email: 'Profitezshopping@gmail.com',
+    password: 'assia20080'
 };
+
+// إضافة متغير لتتبع عدد المنتجات في حالة الانتظار
+let pendingProductsCount = 0;
+
+// إضافة عنصر الإشعار في HTML
+const notificationElement = document.createElement('div');
+notificationElement.id = 'adminNotification';
+notificationElement.className = 'admin-notification';
+document.body.appendChild(notificationElement);
 
 // Load saved data from localStorage
 function loadSavedData() {
@@ -207,31 +216,36 @@ document.querySelectorAll('.select-plan').forEach(button => {
     button.addEventListener('click', (e) => {
         const planElement = e.target.closest('.plan');
         const planType = planElement.dataset.plan;
+        const planLimit = parseInt(planElement.dataset.limit);
+        const planPrice = parseInt(planElement.dataset.price);
         
-        // Check if user has already used the free plan
-        if (planType === 'free') {
-            const userIndex = registeredUsers.findIndex(user => user.email === currentUser.email);
-            if (userIndex !== -1 && registeredUsers[userIndex].hasUsedFreePlan) {
-                alert('لا يمكنك اختيار العرض المجاني مرة أخرى. يرجى اختيار عرض آخر.');
-                return;
-            }
-        }
-        
+        // حفظ معلومات الخطة المختارة
         selectedPlan = {
-            name: planElement.querySelector('h3').textContent,
-            limit: parseInt(planElement.dataset.limit),
-            price: parseInt(planElement.dataset.price),
-            plan: planType
+            type: planType,
+            limit: planLimit,
+            price: planPrice
         };
         
-        // Update payment instructions modal with selected plan info
-        document.getElementById('selectedPlanName').textContent = selectedPlan.name;
-        document.getElementById('selectedPlanLimit').textContent = selectedPlan.limit === 999999 ? 'غير محدود' : selectedPlan.limit;
-        document.getElementById('selectedPlanPrice').textContent = selectedPlan.price;
+        // إخفاء نافذة الخطط
+        document.getElementById('subscriptionPlansModal').style.display = 'none';
         
-        // Show payment instructions modal
-        subscriptionPlansModal.style.display = 'none';
-        paymentInstructionsModal.style.display = 'block';
+        // إظهار نافذة إدخال المنتجات
+        const addProductModal = document.getElementById('addProductModal');
+        addProductModal.style.display = 'block';
+        
+        // تحديث عنوان النافذة
+        document.querySelector('#addProductModal h2').textContent = `إضافة منتجات (${planLimit} منتج متاح)`;
+        
+        // إضافة حقل مخفي لتخزين عدد المنتجات المتبقية
+        const remainingProductsInput = document.createElement('input');
+        remainingProductsInput.type = 'hidden';
+        remainingProductsInput.id = 'remainingProducts';
+        remainingProductsInput.value = planLimit;
+        addProductModal.querySelector('form').appendChild(remainingProductsInput);
+        
+        // تحديث زر الإضافة
+        const submitButton = addProductModal.querySelector('button[type="submit"]');
+        submitButton.textContent = `إضافة المنتج (${planLimit} متبقي)`;
     });
 });
 
@@ -359,126 +373,307 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
-// Handle add product form submission
-addProductForm.addEventListener('submit', function(e) {
+// تحديث نموذج إضافة المنتج
+document.getElementById('addProductForm').innerHTML = `
+    <input type="text" id="productName" placeholder="اسم المنتج" required>
+    <input type="number" id="productPrice" placeholder="السعر" required>
+    <label for="productCategory">فئة المنتج</label>
+    <select id="productCategory" aria-label="فئة المنتج" required>
+        <option value="" disabled selected>اختر فئة المنتج</option>
+        <option value="electronics">إلكترونيات</option>
+        <option value="clothing">ملابس</option>
+        <option value="home">منتجات منزلية</option>
+        <option value="beauty">مستحضرات تجميل</option>
+        <option value="sports">رياضة</option>
+        <option value="books">كتب</option>
+        <option value="toys">ألعاب</option>
+        <option value="food">طعام</option>
+        <option value="other">أخرى</option>
+    </select>
+    <textarea id="productDescription" placeholder="وصف المنتج" required></textarea>
+    <input type="tel" id="productPhone" placeholder="رقم الهاتف" required>
+    <div class="image-upload-container">
+        <label for="productImage" class="image-upload-label">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <span>اختر صورة المنتج</span>
+        </label>
+        <input type="file" id="productImage" accept="image/*" required>
+        <div id="imagePreview" class="image-preview"></div>
+    </div>
+    <button type="submit" id="submitProductBtn">إضافة المنتج</button>
+`;
+
+// إضافة معالجة تحميل الصورة
+document.getElementById('productImage').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        // التحقق من حجم الصورة (أقصى 5 ميجابايت)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('حجم الصورة كبير جداً. الحد الأقصى هو 5 ميجابايت');
+            this.value = '';
+            return;
+        }
+
+        // التحقق من نوع الملف
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            alert('نوع الملف غير مدعوم. يرجى اختيار صورة بصيغة JPG, PNG, GIF أو WebP');
+            this.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('imagePreview');
+            preview.innerHTML = `<img src="${e.target.result}" alt="معاينة الصورة">`;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// تحديث وظيفة إضافة المنتج
+document.getElementById('addProductForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
-    const productName = document.getElementById('productName').value;
-    const productPrice = document.getElementById('productPrice').value;
-    const productCategory = document.getElementById('productCategory').value;
-    const productDescription = document.getElementById('productDescription').value;
-    const productPhone = document.getElementById('productPhone').value;
-    const productImageUrl = document.getElementById('productImageUrl').value;
+    const submitButton = document.getElementById('submitProductBtn');
+    submitButton.disabled = true;
+    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإضافة...';
+    
+    try {
+        // التحقق من صحة البيانات
+        const productName = document.getElementById('productName').value.trim();
+        const productPrice = document.getElementById('productPrice').value.trim();
+        const productCategory = document.getElementById('productCategory').value;
+        const productDescription = document.getElementById('productDescription').value.trim();
+        const productPhone = document.getElementById('productPhone').value.trim();
+        const imageFile = document.getElementById('productImage').files[0];
+        const remainingProducts = parseInt(document.getElementById('remainingProducts').value);
 
-    // إنشاء معرف فريد للمنتج
-    const newProductRef = dbPush(dbRef(db, 'products'));
-    const productId = newProductRef.key;
-
-    // إنشاء كائن المنتج
-    const newProduct = {
-        id: productId,
-        name: productName,
-        price: productPrice,
-        category: productCategory,
-        description: productDescription,
-        phone: productPhone,
-        imageUrl: productImageUrl,
-        date: new Date().toISOString()
-    };
-
-    // حفظ المنتج في Firebase
-    dbSet(newProductRef, newProduct);
-
-    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
-    document.getElementById('addProductModal').style.display = 'none';
-    this.reset();
-});
-
-// Function to edit a product
-function editProduct(productId) {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-        editingProductId = productId;
-        
-        // Fill the form with product data
-        document.getElementById('productName').value = product.name;
-        document.getElementById('productPrice').value = product.price;
-        document.getElementById('productCategory').value = product.category || '';
-        document.getElementById('productDescription').value = product.description;
-        document.getElementById('productPhone').value = product.phone;
-        
-        // Update modal title
-        document.querySelector('#addProductModal h2').textContent = 'تعديل المنتج';
-        
-        // Show the modal
-        addProductModal.style.display = 'block';
-    }
-}
-
-// Function to delete a product
-function deleteProduct(productId) {
-    if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
-        const productIndex = products.findIndex(p => p.id === productId);
-        if (productIndex !== -1) {
-            products.splice(productIndex, 1);
-            saveData();
-            displayProducts();
-            alert('تم حذف المنتج بنجاح');
+        if (!productName || !productPrice || !productCategory || !productDescription || !productPhone) {
+            throw new Error('يرجى ملء جميع الحقول المطلوبة');
         }
-    }
-}
 
-// Add event listener for main product search
-mainProductSearch.addEventListener('input', () => {
-    displayProducts();
+        if (!imageFile) {
+            throw new Error('يرجى اختيار صورة للمنتج');
+        }
+
+        if (remainingProducts <= 0) {
+            throw new Error('لقد وصلت إلى الحد الأقصى من المنتجات المسموح بها في هذه الخطة');
+        }
+
+        // تحميل الصورة إلى Cloudinary
+        const formData = new FormData();
+        formData.append('file', imageFile);
+        formData.append('upload_preset', 'dkvrbc30');
+        formData.append('cloud_name', 'dlrmoc6nq');
+
+        const uploadResponse = await fetch('https://api.cloudinary.com/v1_1/dlrmoc6nq/image/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!uploadResponse.ok) {
+            const errorData = await uploadResponse.json();
+            throw new Error(`فشل في تحميل الصورة: ${errorData.error?.message || 'حدث خطأ غير معروف'}`);
+        }
+
+        const uploadResult = await uploadResponse.json();
+        
+        if (!uploadResult.secure_url) {
+            throw new Error('لم يتم الحصول على رابط الصورة من الخادم');
+        }
+
+        const imageUrl = uploadResult.secure_url;
+
+        // إنشاء كائن المنتج
+        const productData = {
+            id: dbPush(dbRef(db, 'products')).key,
+            name: productName,
+            price: productPrice,
+            category: productCategory,
+            description: productDescription,
+            phone: productPhone,
+            imageUrl: imageUrl,
+            date: new Date().toISOString(),
+            status: currentUser?.role === 'admin' ? 'approved' : 'pending',
+            seller: currentUser?.email || 'غير معروف'
+        };
+
+        // حفظ المنتج في Firebase
+        await dbSet(dbRef(db, `products/${productData.id}`), productData);
+
+        // تحديث عدد المنتجات المتبقية
+        const newRemainingProducts = remainingProducts - 1;
+        document.getElementById('remainingProducts').value = newRemainingProducts;
+        
+        // تحديث زر الإضافة
+        const submitButton = document.getElementById('submitProductBtn');
+        if (newRemainingProducts > 0) {
+            submitButton.textContent = `إضافة المنتج (${newRemainingProducts} متبقي)`;
+            submitButton.disabled = false;
+        } else {
+            submitButton.textContent = 'تم الوصول إلى الحد الأقصى';
+            submitButton.disabled = true;
+        }
+
+        // إعادة تعيين النموذج
+        this.reset();
+        document.getElementById('imagePreview').innerHTML = '';
+        
+        // عرض رسالة مناسبة بناءً على دور المستخدم
+        if (currentUser?.role === 'admin') {
+            alert('تم إضافة المنتج بنجاح وتم عرضه مباشرة في القائمة الرئيسية');
+            displayProducts(); // تحديث عرض المنتجات مباشرة
+        } else {
+            alert('تم إضافة المنتج بنجاح وسيتم مراجعته من قبل المشرف قريباً');
+        }
+    } catch (error) {
+        console.error('خطأ في حفظ المنتج:', error);
+        alert(error.message || 'حدث خطأ أثناء حفظ المنتج. يرجى المحاولة مرة أخرى.');
+    } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = 'إضافة المنتج';
+    }
 });
 
-// Function to display products
+// تحديث وظيفة عرض المنتجات
 function displayProducts() {
     const productsContainer = document.getElementById('productsContainer');
-    productsContainer.innerHTML = '';
+    if (!productsContainer) {
+        console.error('عنصر productsContainer غير موجود');
+        return;
+    }
 
-    // الحصول على مرجع المنتجات من Firebase
-    const productsRef = dbRef(db, 'products');
-    
-    // استماع للتغييرات في قاعدة البيانات
-    dbOnValue(productsRef, (snapshot) => {
-        productsContainer.innerHTML = ''; // مسح المحتوى الحالي
+    // إظهار رسالة التحميل
+    productsContainer.innerHTML = '<div class="loading-message">جاري تحميل المنتجات...</div>';
+
+    try {
+        const productsRef = dbRef(db, 'products');
         
-        const data = snapshot.val();
-        if (data) {
-            // تحويل البيانات إلى مصفوفة
-            const productsArray = Object.values(data);
-            
-            // ترتيب المنتجات حسب التاريخ (الأحدث أولاً)
-            productsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            // عرض كل منتج
-            productsArray.forEach(product => {
-                const productCard = document.createElement('div');
-                productCard.className = 'product-card';
-                productCard.innerHTML = `
-                    <img src="${product.imageUrl}" alt="${product.name}" class="product-image" onerror="this.src='https://via.placeholder.com/300x200?text=صورة+غير+متوفرة'">
-                    <div class="product-info">
-                        <h3 class="product-name">${product.name}</h3>
-                        <p class="product-price">${product.price} دج</p>
-                        <p class="product-category">${getCategoryName(product.category)}</p>
-                        <p class="product-description">${product.description}</p>
-                        <p class="product-phone">رقم الهاتف: ${product.phone}</p>
-                        <p class="product-date">تاريخ الإضافة: ${new Date(product.date).toLocaleDateString('ar-EG')}</p>
+        dbOnValue(productsRef, (snapshot) => {
+            try {
+                productsContainer.innerHTML = '';
+                
+                const data = snapshot.val();
+                console.log('بيانات المنتجات المستوردة:', data);
+
+                if (data) {
+                    const productsArray = Object.entries(data).map(([id, product]) => ({
+                        id,
+                        ...product
+                    }));
+                    
+                    // ترتيب المنتجات حسب التاريخ (الأحدث أولاً)
+                    productsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    
+                    // تصفية المنتجات المعتمدة فقط
+                    const approvedProducts = productsArray.filter(product => product.status === 'approved');
+                    
+                    if (approvedProducts.length > 0) {
+                        approvedProducts.forEach(product => {
+                            try {
+                                const productCard = document.createElement('div');
+                                productCard.className = 'product-card';
+                                
+                                // التحقق من صحة رابط الصورة
+                                let imageUrl = product.imageUrl;
+                                if (!imageUrl || !isValidImageUrl(imageUrl)) {
+                                    imageUrl = 'https://via.placeholder.com/300x200?text=صورة+غير+متوفرة';
+                                }
+                                
+                                const cardContent = `
+                                    <div class="product-image-container">
+                                        <img src="${imageUrl}" 
+                                             alt="${product.name || 'منتج بدون اسم'}" 
+                                             class="product-image" 
+                                             onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=صورة+غير+متوفرة'">
+                                    </div>
+                                    <div class="product-details">
+                                        <div class="product-header">
+                                            <h3 class="product-name">${product.name || 'بدون اسم'}</h3>
+                                            <div class="product-price">${product.price || 0} دج</div>
+                                        </div>
+                                        <div class="product-category">
+                                            <i class="fas fa-tag"></i>
+                                            <span>${getCategoryName(product.category)}</span>
+                                        </div>
+                                        <div class="product-description">${product.description || 'لا يوجد وصف'}</div>
+                                        <div class="product-footer">
+                                            <div class="product-contact">
+                                                <i class="fas fa-phone"></i>
+                                                <span>${product.phone || 'غير متوفر'}</span>
+                                            </div>
+                                            <div class="product-date">
+                                                <i class="far fa-calendar-alt"></i>
+                                                <span>${new Date(product.date).toLocaleDateString('ar-EG')}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                                
+                                productCard.innerHTML = cardContent;
+                                productsContainer.appendChild(productCard);
+                            } catch (error) {
+                                console.error('خطأ في إنشاء بطاقة المنتج:', error);
+                            }
+                        });
+                    } else {
+                        productsContainer.innerHTML = `
+                            <div class="no-products-message">
+                                <i class="fas fa-info-circle"></i>
+                                <p>لا توجد منتجات معتمدة متاحة حالياً</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    productsContainer.innerHTML = `
+                        <div class="no-products-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>لا توجد منتجات متاحة حالياً</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('خطأ في معالجة البيانات:', error);
+                productsContainer.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>حدث خطأ في تحميل المنتجات. يرجى المحاولة مرة أخرى.</p>
                     </div>
                 `;
-                productsContainer.appendChild(productCard);
-            });
-        } else {
-            // عرض رسالة إذا لم تكن هناك منتجات
+            }
+        }, (error) => {
+            console.error('خطأ في استيراد البيانات:', error);
             productsContainer.innerHTML = `
-                <div class="no-products-message">
-                    <p>لا توجد منتجات متاحة حالياً</p>
+                <div class="error-message">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>حدث خطأ في استيراد المنتجات. يرجى المحاولة مرة أخرى.</p>
                 </div>
             `;
-        }
-    });
+        });
+    } catch (error) {
+        console.error('خطأ في تهيئة استيراد البيانات:', error);
+        productsContainer.innerHTML = `
+            <div class="error-message">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>حدث خطأ في تهيئة استيراد المنتجات. يرجى المحاولة مرة أخرى.</p>
+            </div>
+        `;
+    }
+}
+
+// دالة للتحقق من صحة رابط الصورة
+function isValidImageUrl(url) {
+    if (!url) return false;
+    
+    // التحقق من أن الرابط يبدأ بـ http أو https
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return false;
+    }
+    
+    // التحقق من أن الرابط ينتهي بامتداد صورة معروف
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    return imageExtensions.some(ext => url.toLowerCase().endsWith(ext));
 }
 
 // دالة مساعدة لتحويل رمز الفئة إلى اسمها بالعربية
@@ -497,182 +692,339 @@ function getCategoryName(category) {
     return categories[category] || category;
 }
 
-// Function to approve products (admin only)
+// وظيفة اعتماد المنتج
 function approveProduct(productId) {
-    if (currentUser?.role === 'admin') {
-        const product = products.find(p => p.id === productId);
-        if (product) {
-            product.status = 'approved';
-            saveData(); // Save changes to localStorage
-            displayProducts();
-            alert('تم اعتماد المنتج بنجاح');
+    if (!currentUser || currentUser.role !== 'admin') {
+        alert('ليس لديك صلاحية اعتماد المنتجات');
+        return;
+    }
+
+    if (!productId) {
+        alert('معرف المنتج غير صالح');
+        return;
+    }
+
+    try {
+        const productRef = dbRef(db, `products/${productId}`);
+        
+        // جلب بيانات المنتج الحالية
+        dbOnValue(productRef, (snapshot) => {
+            if (!snapshot.exists()) {
+                throw new Error('المنتج غير موجود');
+            }
+
+            const productData = snapshot.val();
+            if (!productData) {
+                throw new Error('بيانات المنتج غير صالحة');
+            }
+
+            // تحديث حالة المنتج فقط مع الحفاظ على باقي البيانات
+            const updatedProduct = {
+                ...productData,
+                status: 'approved',
+                approvedAt: new Date().toISOString(),
+                approvedBy: currentUser.email
+            };
+
+            // حفظ البيانات المحدثة
+            dbSet(productRef, updatedProduct)
+                .then(() => {
+                    console.log('تم تحديث حالة المنتج بنجاح');
+                    
+                    // تحديث عرض المنتجات في لوحة التحكم
+                    displayAdminProducts();
+                    
+                    // تحديث عرض المنتجات في الصفحة الرئيسية
+                    displayProducts();
+                    
+                    alert('تم اعتماد المنتج بنجاح');
+                })
+                .catch(error => {
+                    console.error('خطأ في تحديث حالة المنتج:', error);
+                    alert(`حدث خطأ أثناء اعتماد المنتج: ${error.message || 'خطأ غير معروف'}`);
+                });
+        }, (error) => {
+            console.error('خطأ في جلب بيانات المنتج:', error);
+            alert(`حدث خطأ أثناء جلب بيانات المنتج: ${error.message || 'خطأ غير معروف'}`);
+        });
+    } catch (error) {
+        console.error('خطأ في اعتماد المنتج:', error);
+        alert(`حدث خطأ أثناء اعتماد المنتج: ${error.message || 'خطأ غير معروف'}`);
+    }
+}
+
+// وظيفة رفض المنتج
+function rejectProduct(productId) {
+    if (!currentUser || currentUser.role !== 'admin') {
+        alert('ليس لديك صلاحية رفض المنتجات');
+        return;
+    }
+
+    if (confirm('هل أنت متأكد من رفض هذا المنتج؟ سيتم حذفه نهائياً.')) {
+        try {
+            const productRef = dbRef(db, `products/${productId}`);
+            
+            // حذف المنتج من قاعدة البيانات
+            dbRemove(productRef)
+                .then(() => {
+                    console.log('تم حذف المنتج بنجاح');
+                    
+                    // تحديث عرض المنتجات في لوحة التحكم
+                    displayAdminProducts();
+                    
+                    // تحديث عرض المنتجات في الصفحة الرئيسية
+                    displayProducts();
+                    
+                    alert('تم رفض وحذف المنتج بنجاح');
+                })
+                .catch(error => {
+                    console.error('خطأ في حذف المنتج:', error);
+                    alert('حدث خطأ أثناء رفض المنتج');
+                });
+        } catch (error) {
+            console.error('خطأ في رفض المنتج:', error);
+            alert('حدث خطأ أثناء رفض المنتج');
         }
     }
 }
 
 // Function to display users in admin dashboard
 function displayUsers() {
-    usersList.innerHTML = '';
-    
-    // Filter users based on search query
-    const searchQuery = userSearch.value.toLowerCase();
-    const filteredUsers = registeredUsers.filter(user => 
-        user.email.toLowerCase().includes(searchQuery)
-    );
-    
-    filteredUsers.forEach(user => {
-        const userCard = document.createElement('div');
-        userCard.className = 'user-card';
+    const usersList = document.getElementById('usersList');
+    if (!usersList) return;
+
+    const usersRef = dbRef(db, 'users');
+    dbOnValue(usersRef, (snapshot) => {
+        usersList.innerHTML = '';
         
-        // Get user's products
-        const userProducts = products.filter(p => p.seller === user.email);
-        
-        userCard.innerHTML = `
-            <h3>${user.email}</h3>
-            <div class="user-info">
-                <p>الدور: ${user.role === 'admin' ? 'مشرف' : 'زبون'}</p>
-                <p>الحالة: ${user.status === 'suspended' ? 'موقوف' : 'نشط'}</p>
-                <p>عدد المنتجات: ${userProducts.length}</p>
-                ${user.subscriptionPlan ? `
-                    <p>خطة الاشتراك: ${user.subscriptionPlan.name}</p>
-                    <p>حد المنتجات: ${user.subscriptionPlan.limit}</p>
-                ` : '<p>لا يوجد خطة اشتراك</p>'}
-            </div>
-            <div class="user-actions">
-                ${user.role !== 'admin' ? `
-                    <button onclick="makeAdmin('${user.email}')">تعيين كمشرف</button>
-                ` : ''}
-                ${user.status !== 'suspended' ? `
-                    <button onclick="suspendUser('${user.email}')">إيقاف المستخدم</button>
-                ` : `
-                    <button onclick="activateUser('${user.email}')">تفعيل المستخدم</button>
-                `}
-                <button onclick="deleteUser('${user.email}')">حذف المستخدم</button>
-                <button onclick="viewUserProducts('${user.email}')">عرض المنتجات</button>
-            </div>
-            <div class="user-products" id="user-products-${user.email.replace('@', '-').replace('.', '-')}" style="display: none;">
-                <h4>منتجات المستخدم</h4>
-                <div class="user-products-list">
-                    ${userProducts.length > 0 ? userProducts.map(product => `
-                        <div class="user-product-item">
-                            <p><strong>${product.name}</strong> - ${product.price} دج</p>
-                            <p>الحالة: ${product.status === 'approved' ? 'معتمد' : 'قيد الانتظار'}</p>
-                            <div class="product-actions">
-                                ${product.status === 'pending' ? `
-                                    <button onclick="approveProduct(${product.id})">اعتماد</button>
-                                ` : ''}
-                                <button onclick="editProduct(${product.id})">تعديل</button>
-                                <button onclick="deleteProduct(${product.id})">حذف</button>
-                            </div>
-                        </div>
-                    `).join('') : '<p>لا توجد منتجات</p>'}
-                </div>
-            </div>
-        `;
-        
-        usersList.appendChild(userCard);
+        const data = snapshot.val();
+        if (data) {
+            const usersArray = Object.entries(data).map(([id, user]) => ({
+                id,
+                ...user
+            }));
+            
+            usersArray.forEach(user => {
+                const userCard = document.createElement('div');
+                userCard.className = 'user-card';
+                userCard.innerHTML = `
+                    <h3>${user.email}</h3>
+                    <div class="user-info">
+                        <p>الدور: ${user.role === 'admin' ? 'مشرف' : 'زبون'}</p>
+                        <p>تاريخ التسجيل: ${new Date(user.date).toLocaleDateString('ar-EG')}</p>
+                        ${user.subscriptionPlan ? `
+                            <p>خطة الاشتراك: ${user.subscriptionPlan}</p>
+                        ` : ''}
+                    </div>
+                    <div class="user-actions">
+                        ${user.role !== 'admin' ? `
+                            <button onclick="makeAdmin('${user.id}')">تعيين كمشرف</button>
+                        ` : ''}
+                        <button onclick="deleteUser('${user.id}')">حذف المستخدم</button>
+                    </div>
+                `;
+                usersList.appendChild(userCard);
+            });
+        }
     });
 }
 
-// Function to display all products in admin dashboard
-function displayAdminProducts() {
-    adminProductsList.innerHTML = '';
-    
-    // Filter products based on search query
-    const searchQuery = productSearch.value.toLowerCase();
-    const filteredProducts = products.filter(product => 
-        product.name.toLowerCase().includes(searchQuery) || 
-        product.description.toLowerCase().includes(searchQuery) ||
-        product.seller.toLowerCase().includes(searchQuery) ||
-        (product.category && product.category.toLowerCase().includes(searchQuery))
-    );
-    
-    filteredProducts.forEach(product => {
-        const productCard = document.createElement('div');
-        productCard.className = 'admin-product-card';
-        
-        // Get category display name
-        let categoryDisplay = '';
-        if (product.category) {
-            switch(product.category) {
-                case 'electronics': categoryDisplay = 'إلكترونيات'; break;
-                case 'clothing': categoryDisplay = 'ملابس'; break;
-                case 'home': categoryDisplay = 'منتجات منزلية'; break;
-                case 'beauty': categoryDisplay = 'مستحضرات تجميل'; break;
-                case 'sports': categoryDisplay = 'رياضة'; break;
-                case 'books': categoryDisplay = 'كتب'; break;
-                case 'toys': categoryDisplay = 'ألعاب'; break;
-                case 'food': categoryDisplay = 'طعام'; break;
-                case 'other': categoryDisplay = 'أخرى'; break;
-                default: categoryDisplay = product.category;
-            }
+// وظيفة حذف المنتج
+function deleteProduct(productId) {
+    if (!currentUser || currentUser.role !== 'admin') {
+        alert('ليس لديك صلاحية حذف المنتجات');
+        return;
+    }
+
+    if (!productId) {
+        alert('معرف المنتج غير صالح');
+        return;
+    }
+
+    if (confirm('هل أنت متأكد من حذف هذا المنتج؟')) {
+        try {
+            const productRef = dbRef(db, `products/${productId}`);
+            
+            // حذف المنتج من قاعدة البيانات
+            dbRemove(productRef)
+                .then(() => {
+                    console.log('تم حذف المنتج بنجاح');
+                    
+                    // تحديث عرض المنتجات في لوحة التحكم
+                    displayAdminProducts();
+                    
+                    // تحديث عرض المنتجات في الصفحة الرئيسية
+                    displayProducts();
+                    
+                    alert('تم حذف المنتج بنجاح');
+                })
+                .catch(error => {
+                    console.error('خطأ في حذف المنتج:', error);
+                    alert(`حدث خطأ أثناء حذف المنتج: ${error.message || 'خطأ غير معروف'}`);
+                });
+        } catch (error) {
+            console.error('خطأ في حذف المنتج:', error);
+            alert(`حدث خطأ أثناء حذف المنتج: ${error.message || 'خطأ غير معروف'}`);
         }
+    }
+}
+
+// تحديث وظيفة عرض المنتجات في لوحة تحكم المشرف
+function displayAdminProducts() {
+    const adminProductsList = document.getElementById('adminProductsList');
+    if (!adminProductsList) return;
+
+    const productsRef = dbRef(db, 'products');
+    dbOnValue(productsRef, (snapshot) => {
+        adminProductsList.innerHTML = '';
+        pendingProductsCount = 0; // إعادة تعيين العداد
         
-        productCard.innerHTML = `
-            <h3>${product.name}</h3>
-            <div class="product-info">
-                <p>السعر: ${product.price} دج</p>
-                ${product.category ? `<p>الفئة: ${categoryDisplay}</p>` : ''}
-                <p>الوصف: ${product.description}</p>
-                <p>رقم الهاتف: ${product.phone}</p>
-                <p>البائع: ${product.seller}</p>
-                <p>الحالة: ${product.status === 'approved' ? 'معتمد' : 'قيد الانتظار'}</p>
-            </div>
-            <div class="product-actions">
-                ${product.status === 'pending' ? `
-                    <button onclick="approveProduct(${product.id})">اعتماد</button>
-                ` : ''}
-                <button onclick="editProduct(${product.id})">تعديل</button>
-                <button onclick="deleteProduct(${product.id})">حذف</button>
+        const data = snapshot.val();
+        if (data) {
+            const productsArray = Object.entries(data).map(([id, product]) => ({
+                id,
+                ...product
+            }));
+            
+            // ترتيب المنتجات حسب التاريخ (الأحدث أولاً)
+            productsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            productsArray.forEach(product => {
+                if (product.status === 'pending') {
+                    pendingProductsCount++;
+                }
+                
+                const productCard = document.createElement('div');
+                productCard.className = 'admin-product-card';
+                
+                const cardContent = `
+                    <div class="product-image-container">
+                        <img src="${product.imageUrl}" 
+                             alt="${product.name || 'منتج بدون اسم'}" 
+                             class="product-image" 
+                             onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=صورة+غير+متوفرة'">
+                    </div>
+                    <div class="product-details">
+                        <div class="product-header">
+                            <h3 class="product-name">${product.name || 'بدون اسم'}</h3>
+                            <div class="product-price">${product.price || 0} دج</div>
+                        </div>
+                        <div class="product-category">
+                            <i class="fas fa-tag"></i>
+                            <span>${getCategoryName(product.category)}</span>
+                        </div>
+                        <div class="product-description">${product.description || 'لا يوجد وصف'}</div>
+                        <div class="product-footer">
+                            <div class="product-contact">
+                                <i class="fas fa-phone"></i>
+                                <span>${product.phone || 'غير متوفر'}</span>
+                            </div>
+                            <div class="product-date">
+                                <i class="far fa-calendar-alt"></i>
+                                <span>${new Date(product.date).toLocaleDateString('ar-EG')}</span>
+                            </div>
+                            <div class="product-status">
+                                <i class="fas fa-info-circle"></i>
+                                <span>${product.status === 'pending' ? 'قيد الانتظار' : 
+                                      product.status === 'approved' ? 'معتمد' : 'مرفوض'}</span>
+                            </div>
+                            <div class="product-seller">
+                                <i class="fas fa-user"></i>
+                                <span>${product.seller || 'غير معروف'}</span>
+                            </div>
+                        </div>
+                        <div class="admin-actions">
+                            ${product.status === 'pending' ? `
+                                <button onclick="approveProduct('${product.id}')" class="approve-btn">
+                                    <i class="fas fa-check"></i> اعتماد
+                                </button>
+                                <button onclick="rejectProduct('${product.id}')" class="reject-btn">
+                                    <i class="fas fa-times"></i> رفض
+                                </button>
+                            ` : ''}
+                            <button onclick="deleteProduct('${product.id}')" class="delete-btn">
+                                <i class="fas fa-trash"></i> حذف
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                productCard.innerHTML = cardContent;
+                adminProductsList.appendChild(productCard);
+            });
+            
+            // تحديث الإشعار
+            updateAdminNotification();
+        }
+    });
+}
+
+// وظيفة تحديث إشعار المشرف
+function updateAdminNotification() {
+    const notification = document.getElementById('adminNotification');
+    if (!notification) return;
+    
+    if (pendingProductsCount > 0) {
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-bell"></i>
+                <span>${pendingProductsCount} منتج في انتظار المراجعة</span>
             </div>
         `;
+        notification.style.display = 'block';
         
-        adminProductsList.appendChild(productCard);
-    });
+        // إضافة تأثير الاهتزاز للإشعار
+        notification.classList.add('shake');
+        setTimeout(() => {
+            notification.classList.remove('shake');
+        }, 1000);
+    } else {
+        notification.style.display = 'none';
+    }
 }
 
 // Function to display feedbacks in admin dashboard
 function displayFeedbacks() {
-    feedbackList.innerHTML = '';
-    
-    // Filter feedbacks based on search query
-    const searchQuery = feedbackSearch.value.toLowerCase();
-    const filteredFeedbacks = feedbacks.filter(feedback => 
-        feedback.subject.toLowerCase().includes(searchQuery) || 
-        feedback.message.toLowerCase().includes(searchQuery) ||
-        feedback.user.toLowerCase().includes(searchQuery)
-    );
-    
-    // Sort feedbacks by date (newest first)
-    filteredFeedbacks.sort((a, b) => new Date(b.date) - new Date(a.date));
-    
-    filteredFeedbacks.forEach(feedback => {
-        const feedbackCard = document.createElement('div');
-        feedbackCard.className = 'feedback-card';
+    const feedbackList = document.getElementById('feedbackList');
+    if (!feedbackList) return;
+
+    const feedbackRef = dbRef(db, 'feedback');
+    dbOnValue(feedbackRef, (snapshot) => {
+        feedbackList.innerHTML = '';
         
-        // Format date
-        const feedbackDate = new Date(feedback.date);
-        const formattedDate = `${feedbackDate.getFullYear()}-${(feedbackDate.getMonth() + 1).toString().padStart(2, '0')}-${feedbackDate.getDate().toString().padStart(2, '0')} ${feedbackDate.getHours().toString().padStart(2, '0')}:${feedbackDate.getMinutes().toString().padStart(2, '0')}`;
-        
-        feedbackCard.innerHTML = `
-            <h3>${feedback.subject} <span class="feedback-status ${feedback.status}">${getStatusText(feedback.status)}</span></h3>
-            <div class="feedback-info">
-                <p>من: ${feedback.user}</p>
-                <p>التاريخ: ${formattedDate}</p>
-            </div>
-            <div class="feedback-message">
-                ${feedback.message}
-            </div>
-            <div class="feedback-actions">
-                ${feedback.status === 'pending' ? `
-                    <button onclick="resolveFeedback(${feedback.id})">حل المشكلة</button>
-                    <button onclick="rejectFeedback(${feedback.id})">رفض التعليق</button>
-                ` : ''}
-                <button onclick="deleteFeedback(${feedback.id})">حذف التعليق</button>
-            </div>
-        `;
-        
-        feedbackList.appendChild(feedbackCard);
+        const data = snapshot.val();
+        if (data) {
+            const feedbackArray = Object.entries(data).map(([id, feedback]) => ({
+                id,
+                ...feedback
+            }));
+            
+            feedbackArray.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            feedbackArray.forEach(feedback => {
+                const feedbackCard = document.createElement('div');
+                feedbackCard.className = 'feedback-card';
+                feedbackCard.innerHTML = `
+                    <h3>${feedback.subject}</h3>
+                    <div class="feedback-info">
+                        <p>من: ${feedback.user}</p>
+                        <p>التاريخ: ${new Date(feedback.date).toLocaleDateString('ar-EG')}</p>
+                        <p>الحالة: ${getStatusText(feedback.status)}</p>
+                    </div>
+                    <div class="feedback-message">
+                        ${feedback.message}
+                    </div>
+                    <div class="feedback-actions">
+                        ${feedback.status === 'pending' ? `
+                            <button onclick="resolveFeedback('${feedback.id}')">حل المشكلة</button>
+                            <button onclick="rejectFeedback('${feedback.id}')">رفض التعليق</button>
+                        ` : ''}
+                        <button onclick="deleteFeedback('${feedback.id}')">حذف التعليق</button>
+                    </div>
+                `;
+                feedbackList.appendChild(feedbackCard);
+            });
+        }
     });
 }
 
@@ -742,32 +1094,6 @@ function makeAdmin(email) {
     }
 }
 
-// Function to suspend a user
-function suspendUser(email) {
-    if (confirm(`هل أنت متأكد من إيقاف المستخدم ${email}؟`)) {
-        const userIndex = registeredUsers.findIndex(user => user.email === email);
-        if (userIndex !== -1) {
-            registeredUsers[userIndex].status = 'suspended';
-            saveData();
-            displayUsers();
-            alert(`تم إيقاف المستخدم ${email} بنجاح`);
-        }
-    }
-}
-
-// Function to activate a suspended user
-function activateUser(email) {
-    if (confirm(`هل أنت متأكد من تفعيل المستخدم ${email}؟`)) {
-        const userIndex = registeredUsers.findIndex(user => user.email === email);
-        if (userIndex !== -1) {
-            registeredUsers[userIndex].status = 'active';
-            saveData();
-            displayUsers();
-            alert(`تم تفعيل المستخدم ${email} بنجاح`);
-        }
-    }
-}
-
 // Function to delete a user
 function deleteUser(email) {
     if (confirm(`هل أنت متأكد من حذف المستخدم ${email}؟ سيتم حذف جميع منتجاته أيضاً.`)) {
@@ -783,16 +1109,6 @@ function deleteUser(email) {
         saveData();
         displayUsers();
         alert(`تم حذف المستخدم ${email} وجميع منتجاته بنجاح`);
-    }
-}
-
-// Function to view user products
-function viewUserProducts(email) {
-    const productsContainer = document.getElementById(`user-products-${email.replace('@', '-').replace('.', '-')}`);
-    if (productsContainer.style.display === 'none') {
-        productsContainer.style.display = 'block';
-    } else {
-        productsContainer.style.display = 'none';
     }
 }
 
@@ -998,41 +1314,6 @@ function loadFeedback() {
     });
 }
 
-// تحديث وظيفة إضافة منتج جديد
-document.getElementById('addProductForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const productName = document.getElementById('productName').value;
-    const productPrice = document.getElementById('productPrice').value;
-    const productCategory = document.getElementById('productCategory').value;
-    const productDescription = document.getElementById('productDescription').value;
-    const productPhone = document.getElementById('productPhone').value;
-    const productImageUrl = document.getElementById('productImageUrl').value;
-
-    // إنشاء معرف فريد للمنتج
-    const newProductRef = dbPush(dbRef(db, 'products'));
-    const productId = newProductRef.key;
-
-    // إنشاء كائن المنتج
-    const newProduct = {
-        id: productId,
-        name: productName,
-        price: productPrice,
-        category: productCategory,
-        description: productDescription,
-        phone: productPhone,
-        imageUrl: productImageUrl,
-        date: new Date().toISOString()
-    };
-
-    // حفظ المنتج في Firebase
-    dbSet(newProductRef, newProduct);
-
-    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
-    document.getElementById('addProductModal').style.display = 'none';
-    this.reset();
-});
-
 // تحديث وظيفة إرسال التعليق
 document.getElementById('feedbackForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -1062,52 +1343,80 @@ document.getElementById('feedbackForm').addEventListener('submit', function(e) {
 });
 
 // تحديث وظيفة تسجيل الدخول
-document.getElementById('loginForm').addEventListener('submit', function(e) {
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-
-    // إنشاء معرف فريد للمستخدم
-    const newUserRef = dbPush(dbRef(db, 'users'));
-    const userId = newUserRef.key;
-
-    // إنشاء كائن المستخدم
-    const newUser = {
-        id: userId,
-        email: email,
-        password: password, // في التطبيق الحقيقي، يجب تشفير كلمة المرور
-        date: new Date().toISOString(),
-        role: 'user'
-    };
-
-    // حفظ المستخدم في Firebase
-    dbSet(newUserRef, newUser);
-
-    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
-    document.getElementById('loginModal').style.display = 'none';
-    this.reset();
+    
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // جلب معلومات المستخدم من قاعدة البيانات
+        const userRef = dbRef(db, `users/${user.uid}`);
+        const snapshot = await dbGet(userRef);
+        
+        if (snapshot.exists()) {
+            const userData = snapshot.val();
+            currentUser = {
+                uid: user.uid,
+                email: user.email,
+                role: userData.role || 'user',
+                subscriptionPlan: userData.subscriptionPlan
+            };
+            
+            // إظهار الإشعار إذا كان المستخدم مشرفاً
+            if (currentUser.role === 'admin') {
+                updateAdminNotification();
+            }
+            
+            // ... باقي الكود كما هو ...
+        }
+    } catch (error) {
+        console.error('خطأ في تسجيل الدخول:', error);
+        alert('فشل تسجيل الدخول: ' + error.message);
+    }
 });
 
 // تحديث وظيفة البحث عن المنتجات
 document.getElementById('mainProductSearch').addEventListener('input', function(e) {
     const searchQuery = e.target.value.toLowerCase();
     const productsContainer = document.getElementById('productsContainer');
+    if (!productsContainer) return;
+
     const productCards = productsContainer.getElementsByClassName('product-card');
+    let hasVisibleProducts = false;
 
     Array.from(productCards).forEach(card => {
-        const productName = card.querySelector('.product-name').textContent.toLowerCase();
-        const productDescription = card.querySelector('.product-description').textContent.toLowerCase();
-        const productCategory = card.querySelector('.product-category').textContent.toLowerCase();
+        const productName = card.querySelector('.product-name')?.textContent.toLowerCase() || '';
+        const productDescription = card.querySelector('.product-description')?.textContent.toLowerCase() || '';
+        const productCategory = card.querySelector('.product-category')?.textContent.toLowerCase() || '';
 
-        if (productName.includes(searchQuery) || 
-            productDescription.includes(searchQuery) || 
-            productCategory.includes(searchQuery)) {
-            card.style.display = '';
-        } else {
-            card.style.display = 'none';
-        }
+        const isVisible = productName.includes(searchQuery) || 
+                        productDescription.includes(searchQuery) || 
+                        productCategory.includes(searchQuery);
+
+        card.style.display = isVisible ? '' : 'none';
+        if (isVisible) hasVisibleProducts = true;
     });
+
+    // إظهار رسالة إذا لم يتم العثور على نتائج
+    const noResultsMessage = document.getElementById('noResultsMessage');
+    if (!hasVisibleProducts) {
+        if (!noResultsMessage) {
+            const message = document.createElement('div');
+            message.id = 'noResultsMessage';
+            message.className = 'no-products-message';
+            message.innerHTML = `
+                <i class="fas fa-search"></i>
+                <p>لم يتم العثور على منتجات مطابقة للبحث</p>
+            `;
+            productsContainer.appendChild(message);
+        }
+    } else if (noResultsMessage) {
+        noResultsMessage.remove();
+    }
 });
 
 // استدعاء وظيفة عرض المنتجات عند تحميل الصفحة
