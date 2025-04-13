@@ -326,6 +326,11 @@ loginForm.addEventListener('submit', (e) => {
         alert('تم تسجيل الدخول كمشرف بنجاح');
         loginModal.style.display = 'none';
         updateUI();
+        // Show admin dashboard immediately after login
+        adminDashboardModal.style.display = 'block';
+        displayAdminProducts();
+        displayUsers();
+        displayFeedbacks();
     } else {
         alert('البريد الإلكتروني أو كلمة المرور غير صحيحة');
     }
@@ -1083,23 +1088,14 @@ feedbackSearch.addEventListener('input', displayFeedbacks);
 
 // Function to update UI based on user role
 function updateUI() {
-    if (currentUser) {
-        if (currentUser.role === 'admin') {
-            loginBtn.textContent = 'لوحة التحكم';
-            loginBtn.onclick = () => {
-                adminDashboardModal.style.display = 'block';
-                displayUsers(); // Load users when dashboard opens
-            };
-        } else {
-            loginBtn.textContent = 'تسجيل الخروج';
-            loginBtn.onclick = () => {
-                currentUser = null;
-                updateUI();
-            };
-            
-            // Display subscription status for customers
-            displaySubscriptionStatus();
-        }
+    if (currentUser && currentUser.isAdmin) {
+        loginBtn.textContent = 'لوحة التحكم';
+        loginBtn.onclick = () => {
+            adminDashboardModal.style.display = 'block';
+            displayAdminProducts();
+            displayUsers();
+            displayFeedbacks();
+        };
     } else {
         loginBtn.textContent = 'تسجيل الدخول';
         loginBtn.onclick = () => {
