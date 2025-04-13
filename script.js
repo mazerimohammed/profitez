@@ -313,58 +313,22 @@ confirmPaymentBtn.addEventListener('click', () => {
 // Handle login form submission
 loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
 
     // Check if credentials match admin credentials
-    if (email === adminCredentials.email && password === adminCredentials.password) {
-        currentUser = { role: 'admin', email };
+    if (email.toLowerCase() === adminCredentials.email.toLowerCase() && password === adminCredentials.password) {
+        currentUser = { 
+            role: 'admin', 
+            email: email,
+            isAdmin: true
+        };
         alert('تم تسجيل الدخول كمشرف بنجاح');
+        loginModal.style.display = 'none';
+        updateUI();
     } else {
-        // Check if user is already registered
-        const existingUser = registeredUsers.find(user => user.email === email);
-        
-        if (existingUser) {
-            // User exists, check password
-            if (existingUser.password === password) {
-                currentUser = { 
-                    role: existingUser.role || 'customer', 
-                    email,
-                    subscriptionPlan: existingUser.subscriptionPlan || null,
-                    hasUsedFreePlan: existingUser.hasUsedFreePlan || false
-                };
-                alert('تم تسجيل الدخول بنجاح');
-            } else {
-                alert('كلمة المرور غير صحيحة');
-                return;
-            }
-        } else {
-            // Check if email is valid
-            if (!isValidEmail(email)) {
-                alert('البريد الإلكتروني غير صالح. يرجى إدخال بريد إلكتروني صحيح.');
-                return;
-            }
-            
-            // New user registration
-            const newUser = { 
-                email, 
-                password,
-                role: 'customer',
-                hasUsedFreePlan: false
-            };
-            registeredUsers.push(newUser);
-            saveData();
-            currentUser = { 
-                role: 'customer', 
-                email,
-                hasUsedFreePlan: false
-            };
-            alert('تم تسجيل حساب جديد بنجاح');
-        }
+        alert('البريد الإلكتروني أو كلمة المرور غير صحيحة');
     }
-
-    loginModal.style.display = 'none';
-    updateUI();
 });
 
 // Function to validate email format
