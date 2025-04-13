@@ -32,7 +32,7 @@ const sidebarLinks = document.querySelectorAll('.sidebar-links a');
 const sidebarAddProductBtn = document.getElementById('sidebarAddProductBtn');
 const sidebarFeedbackBtn = document.getElementById('sidebarFeedbackBtn');
 const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
-const sidebarAdminDashboardBtn = document.getElementById('sidebarAdminDashboardBtn');
+const sidebarAdminBtn = document.getElementById('sidebarAdminBtn');
 
 // Sample data structure for products
 let products = [];
@@ -311,75 +311,70 @@ confirmPaymentBtn.addEventListener('click', () => {
     }
 });
 
-// تحديث واجهة المستخدم بناءً على دور المستخدم
-function updateUI() {
-    const loginBtn = document.getElementById('loginBtn');
-    const adminDashboardBtn = document.getElementById('adminDashboardBtn');
-    const sidebarAdminDashboardBtn = document.getElementById('sidebarAdminDashboardBtn');
-    
-    if (currentUser) {
-        if (currentUser.role === 'admin') {
-            loginBtn.textContent = 'تسجيل الخروج';
-            adminDashboardBtn.style.display = 'flex';
-            sidebarAdminDashboardBtn.style.display = 'flex';
-        } else {
-            loginBtn.textContent = 'تسجيل الخروج';
-            adminDashboardBtn.style.display = 'none';
-            sidebarAdminDashboardBtn.style.display = 'none';
-        }
-    } else {
-        loginBtn.textContent = 'تسجيل الدخول';
-        adminDashboardBtn.style.display = 'none';
-        sidebarAdminDashboardBtn.style.display = 'none';
-    }
-}
-
-// إضافة مستمع حدث لزر لوحة التحكم في القائمة الجانبية
-document.getElementById('sidebarAdminDashboardBtn').addEventListener('click', function(e) {
-    e.preventDefault();
-    if (currentUser && currentUser.role === 'admin') {
-        adminDashboardModal.style.display = 'block';
-        displayAdminProducts();
-        closeSidebarMenu();
-    }
-});
-
-// تحديث وظيفة إغلاق القائمة الجانبية
-function closeSidebarMenu() {
-    sidebar.classList.remove('active');
-    overlay.classList.remove('active');
-    document.body.classList.remove('sidebar-open');
-    document.body.style.overflow = '';
-}
-
-// تحديث مستمع حدث تسجيل الدخول
-document.getElementById('loginForm').addEventListener('submit', function(e) {
+// Handle login form submission
+loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
+    // Check if credentials match admin credentials
     if (email === adminCredentials.email && password === adminCredentials.password) {
         currentUser = { role: 'admin', email };
         alert('تم تسجيل الدخول كمشرف بنجاح');
-        loginModal.style.display = 'none';
-        updateUI();
     } else {
-        alert('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+        // Check if user is already registered
+        const existingUser = registeredUsers.find(user => user.email === email);
+        
+        if (existingUser) {
+            // User exists, check password
+            if (existingUser.password === password) {
+                currentUser = { 
+                    role: existingUser.role || 'customer', 
+                    email,
+                    subscriptionPlan: existingUser.subscriptionPlan || null,
+                    hasUsedFreePlan: existingUser.hasUsedFreePlan || false
+                };
+                alert('تم تسجيل الدخول بنجاح');
+            } else {
+                alert('كلمة المرور غير صحيحة');
+                return;
+            }
+        } else {
+            // Check if email is valid
+            if (!isValidEmail(email)) {
+                alert('البريد الإلكتروني غير صالح. يرجى إدخال بريد إلكتروني صحيح.');
+                return;
+            }
+            
+            // New user registration
+            const newUser = { 
+                email, 
+                password,
+                role: 'customer',
+                hasUsedFreePlan: false
+            };
+            registeredUsers.push(newUser);
+            saveData();
+            currentUser = { 
+                role: 'customer', 
+                email,
+                hasUsedFreePlan: false
+            };
+            alert('تم تسجيل حساب جديد بنجاح');
+        }
     }
+
+    loginModal.style.display = 'none';
+    updateUI();
 });
 
-// تحديث مستمع حدث تسجيل الخروج
-document.getElementById('loginBtn').addEventListener('click', function(e) {
-    if (currentUser) {
-        currentUser = null;
-        updateUI();
-        alert('تم تسجيل الخروج بنجاح');
-    } else {
-        loginModal.style.display = 'block';
-    }
-});
+// Function to validate email format
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
 
-// تحديث وظيفة إضافة المنتج
+// تحديث نموذج إضافة المنتج
 document.getElementById('addProductForm').innerHTML = `
     <input type="text" id="productName" placeholder="اسم المنتج" required>
     <input type="number" id="productPrice" placeholder="السعر" required>
@@ -1000,6 +995,11 @@ function updateAdminNotification() {
         setTimeout(() => {
             notification.classList.remove('shake');
         }, 1000);
+
+        // إخفاء الإشعار بعد 5 ثواني
+        setTimeout(() => {
+            notification.style.display = 'none';
+        }, 5000);
     } else {
         notification.style.display = 'none';
     }
@@ -1139,6 +1139,53 @@ userSearch.addEventListener('input', displayUsers);
 productSearch.addEventListener('input', displayAdminProducts);
 feedbackSearch.addEventListener('input', displayFeedbacks);
 
+// Function to update UI based on user role
+function updateUI() {
+    const loginBtn = document.getElementById('loginBtn');
+    const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
+    const sidebarAdminBtn = document.getElementById('sidebarAdminBtn');
+    
+    if (currentUser) {
+        if (currentUser.role === 'admin') {
+            loginBtn.textContent = 'لوحة التحكم';
+            loginBtn.onclick = () => {
+                adminDashboardModal.style.display = 'block';
+                displayUsers();
+            };
+            
+            // إظهار زر لوحة التحكم في القائمة الجانبية
+            if (sidebarAdminBtn) {
+                sidebarAdminBtn.style.display = 'block';
+                sidebarLoginBtn.style.display = 'none';
+            }
+        } else {
+            loginBtn.textContent = 'تسجيل الخروج';
+            loginBtn.onclick = () => {
+                currentUser = null;
+                updateUI();
+            };
+            
+            // إخفاء زر لوحة التحكم في القائمة الجانبية
+            if (sidebarAdminBtn) {
+                sidebarAdminBtn.style.display = 'none';
+                sidebarLoginBtn.style.display = 'block';
+            }
+        }
+    } else {
+        loginBtn.textContent = 'تسجيل الدخول';
+        loginBtn.onclick = () => {
+            loginModal.style.display = 'block';
+        };
+        
+        // إخفاء زر لوحة التحكم في القائمة الجانبية
+        if (sidebarAdminBtn) {
+            sidebarAdminBtn.style.display = 'none';
+            sidebarLoginBtn.style.display = 'block';
+        }
+    }
+    displayProducts();
+}
+
 // Function to display subscription status for customers
 function displaySubscriptionStatus() {
     if (!currentUser || currentUser.role === 'admin') return;
@@ -1193,6 +1240,17 @@ menuToggle.addEventListener('click', () => {
     document.body.classList.add('sidebar-open');
     document.body.style.overflow = 'hidden';
 });
+
+// Close sidebar
+function closeSidebarMenu() {
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-open');
+    document.body.style.overflow = '';
+}
+
+closeSidebar.addEventListener('click', closeSidebarMenu);
+overlay.addEventListener('click', closeSidebarMenu);
 
 // Handle sidebar links
 sidebarLinks.forEach(link => {
@@ -1325,6 +1383,43 @@ document.getElementById('feedbackForm').addEventListener('submit', function(e) {
     this.reset();
 });
 
+// تحديث وظيفة تسجيل الدخول
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // جلب معلومات المستخدم من قاعدة البيانات
+        const userRef = dbRef(db, `users/${user.uid}`);
+        const snapshot = await dbGet(userRef);
+        
+        if (snapshot.exists()) {
+            const userData = snapshot.val();
+            currentUser = {
+                uid: user.uid,
+                email: user.email,
+                role: userData.role || 'user',
+                subscriptionPlan: userData.subscriptionPlan
+            };
+            
+            // إظهار الإشعار إذا كان المستخدم مشرفاً
+            if (currentUser.role === 'admin') {
+                updateAdminNotification();
+            }
+            
+            // ... باقي الكود كما هو ...
+        }
+    } catch (error) {
+        console.error('خطأ في تسجيل الدخول:', error);
+        alert('فشل تسجيل الدخول: ' + error.message);
+    }
+});
+
 // تحديث وظيفة البحث عن المنتجات
 document.getElementById('mainProductSearch').addEventListener('input', function(e) {
     const searchQuery = e.target.value.toLowerCase();
@@ -1368,4 +1463,19 @@ document.getElementById('mainProductSearch').addEventListener('input', function(
 // استدعاء وظيفة عرض المنتجات عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', () => {
     displayProducts();
+});
+
+// إضافة معالج الحدث لزر لوحة التحكم في القائمة الجانبية
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebarAdminBtn = document.getElementById('sidebarAdminBtn');
+    if (sidebarAdminBtn) {
+        sidebarAdminBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (currentUser && currentUser.role === 'admin') {
+                adminDashboardModal.style.display = 'block';
+                displayUsers();
+                closeSidebarMenu();
+            }
+        });
+    }
 }); 
