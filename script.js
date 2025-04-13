@@ -32,6 +32,7 @@ const sidebarLinks = document.querySelectorAll('.sidebar-links a');
 const sidebarAddProductBtn = document.getElementById('sidebarAddProductBtn');
 const sidebarFeedbackBtn = document.getElementById('sidebarFeedbackBtn');
 const sidebarLoginBtn = document.getElementById('sidebarLoginBtn');
+const sidebarAdminDashboardBtn = document.getElementById('sidebarAdminDashboardBtn');
 
 // Sample data structure for products
 let products = [];
@@ -310,39 +311,75 @@ confirmPaymentBtn.addEventListener('click', () => {
     }
 });
 
-// Handle login form submission
-loginForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value.trim();
+// تحديث واجهة المستخدم بناءً على دور المستخدم
+function updateUI() {
+    const loginBtn = document.getElementById('loginBtn');
+    const adminDashboardBtn = document.getElementById('adminDashboardBtn');
+    const sidebarAdminDashboardBtn = document.getElementById('sidebarAdminDashboardBtn');
+    
+    if (currentUser) {
+        if (currentUser.role === 'admin') {
+            loginBtn.textContent = 'تسجيل الخروج';
+            adminDashboardBtn.style.display = 'flex';
+            sidebarAdminDashboardBtn.style.display = 'flex';
+        } else {
+            loginBtn.textContent = 'تسجيل الخروج';
+            adminDashboardBtn.style.display = 'none';
+            sidebarAdminDashboardBtn.style.display = 'none';
+        }
+    } else {
+        loginBtn.textContent = 'تسجيل الدخول';
+        adminDashboardBtn.style.display = 'none';
+        sidebarAdminDashboardBtn.style.display = 'none';
+    }
+}
 
-    // Check if credentials match admin credentials
-    if (email.toLowerCase() === adminCredentials.email.toLowerCase() && password === adminCredentials.password) {
-        currentUser = { 
-            role: 'admin', 
-            email: email,
-            isAdmin: true
-        };
+// إضافة مستمع حدث لزر لوحة التحكم في القائمة الجانبية
+document.getElementById('sidebarAdminDashboardBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    if (currentUser && currentUser.role === 'admin') {
+        adminDashboardModal.style.display = 'block';
+        displayAdminProducts();
+        closeSidebarMenu();
+    }
+});
+
+// تحديث وظيفة إغلاق القائمة الجانبية
+function closeSidebarMenu() {
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-open');
+    document.body.style.overflow = '';
+}
+
+// تحديث مستمع حدث تسجيل الدخول
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    if (email === adminCredentials.email && password === adminCredentials.password) {
+        currentUser = { role: 'admin', email };
         alert('تم تسجيل الدخول كمشرف بنجاح');
         loginModal.style.display = 'none';
         updateUI();
-        // Show admin dashboard immediately after login
-        adminDashboardModal.style.display = 'block';
-        displayAdminProducts();
-        displayUsers();
-        displayFeedbacks();
     } else {
         alert('البريد الإلكتروني أو كلمة المرور غير صحيحة');
     }
 });
 
-// Function to validate email format
-function isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-}
+// تحديث مستمع حدث تسجيل الخروج
+document.getElementById('loginBtn').addEventListener('click', function(e) {
+    if (currentUser) {
+        currentUser = null;
+        updateUI();
+        alert('تم تسجيل الخروج بنجاح');
+    } else {
+        loginModal.style.display = 'block';
+    }
+});
 
-// تحديث نموذج إضافة المنتج
+// تحديث وظيفة إضافة المنتج
 document.getElementById('addProductForm').innerHTML = `
     <input type="text" id="productName" placeholder="اسم المنتج" required>
     <input type="number" id="productPrice" placeholder="السعر" required>
@@ -687,6 +724,12 @@ function approveProduct(productId) {
                 throw new Error('بيانات المنتج غير صالحة');
             }
 
+            // التحقق من حالة المنتج الحالية
+            if (productData.status === 'approved') {
+                alert('هذا المنتج معتمد بالفعل');
+                return;
+            }
+
             // تحديث حالة المنتج فقط مع الحفاظ على باقي البيانات
             const updatedProduct = {
                 ...productData,
@@ -706,7 +749,17 @@ function approveProduct(productId) {
                     // تحديث عرض المنتجات في الصفحة الرئيسية
                     displayProducts();
                     
-                    alert('تم اعتماد المنتج بنجاح');
+                    // تحديث عدد المنتجات في انتظار المراجعة
+                    updateAdminNotification();
+                    
+                    // إظهار رسالة النجاح مرة واحدة فقط
+                    if (!window.productApprovalMessageShown) {
+                        alert('تم اعتماد المنتج بنجاح');
+                        window.productApprovalMessageShown = true;
+                        setTimeout(() => {
+                            window.productApprovalMessageShown = false;
+                        }, 1000);
+                    }
                 })
                 .catch(error => {
                     console.error('خطأ في تحديث حالة المنتج:', error);
@@ -1086,25 +1139,6 @@ userSearch.addEventListener('input', displayUsers);
 productSearch.addEventListener('input', displayAdminProducts);
 feedbackSearch.addEventListener('input', displayFeedbacks);
 
-// Function to update UI based on user role
-function updateUI() {
-    if (currentUser && currentUser.isAdmin) {
-        loginBtn.textContent = 'لوحة التحكم';
-        loginBtn.onclick = () => {
-            adminDashboardModal.style.display = 'block';
-            displayAdminProducts();
-            displayUsers();
-            displayFeedbacks();
-        };
-    } else {
-        loginBtn.textContent = 'تسجيل الدخول';
-        loginBtn.onclick = () => {
-            loginModal.style.display = 'block';
-        };
-    }
-    displayProducts();
-}
-
 // Function to display subscription status for customers
 function displaySubscriptionStatus() {
     if (!currentUser || currentUser.role === 'admin') return;
@@ -1159,17 +1193,6 @@ menuToggle.addEventListener('click', () => {
     document.body.classList.add('sidebar-open');
     document.body.style.overflow = 'hidden';
 });
-
-// Close sidebar
-function closeSidebarMenu() {
-    sidebar.classList.remove('active');
-    overlay.classList.remove('active');
-    document.body.classList.remove('sidebar-open');
-    document.body.style.overflow = '';
-}
-
-closeSidebar.addEventListener('click', closeSidebarMenu);
-overlay.addEventListener('click', closeSidebarMenu);
 
 // Handle sidebar links
 sidebarLinks.forEach(link => {
@@ -1300,43 +1323,6 @@ document.getElementById('feedbackForm').addEventListener('submit', function(e) {
     // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
     document.getElementById('feedbackModal').style.display = 'none';
     this.reset();
-});
-
-// تحديث وظيفة تسجيل الدخول
-document.getElementById('loginForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
-    try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        
-        // جلب معلومات المستخدم من قاعدة البيانات
-        const userRef = dbRef(db, `users/${user.uid}`);
-        const snapshot = await dbGet(userRef);
-        
-        if (snapshot.exists()) {
-            const userData = snapshot.val();
-            currentUser = {
-                uid: user.uid,
-                email: user.email,
-                role: userData.role || 'user',
-                subscriptionPlan: userData.subscriptionPlan
-            };
-            
-            // إظهار الإشعار إذا كان المستخدم مشرفاً
-            if (currentUser.role === 'admin') {
-                updateAdminNotification();
-            }
-            
-            // ... باقي الكود كما هو ...
-        }
-    } catch (error) {
-        console.error('خطأ في تسجيل الدخول:', error);
-        alert('فشل تسجيل الدخول: ' + error.message);
-    }
 });
 
 // تحديث وظيفة البحث عن المنتجات
