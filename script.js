@@ -311,233 +311,279 @@ confirmPaymentBtn.addEventListener('click', () => {
     }
 });
 
-// Handle login form submission
-loginForm.addEventListener('submit', (e) => {
+// تحديث وظيفة تسجيل الدخول
+document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-
-    // Check if credentials match admin credentials
+    
+    // التحقق من بيانات المشرف
     if (email === adminCredentials.email && password === adminCredentials.password) {
-        currentUser = { role: 'admin', email };
-        alert('تم تسجيل الدخول كمشرف بنجاح');
-    } else {
-        // Check if user is already registered
-        const existingUser = registeredUsers.find(user => user.email === email);
+        currentUser = {
+            email: email,
+            role: 'admin'
+        };
         
-        if (existingUser) {
-            // User exists, check password
-            if (existingUser.password === password) {
-                currentUser = { 
-                    role: existingUser.role || 'customer', 
-                    email,
-                    subscriptionPlan: existingUser.subscriptionPlan || null,
-                    hasUsedFreePlan: existingUser.hasUsedFreePlan || false
+        // حفظ حالة المستخدم في localStorage
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        // تحديث واجهة المستخدم
+        updateUI();
+        
+        // إغلاق نافذة تسجيل الدخول
+        loginModal.style.display = 'none';
+        
+        // إظهار لوحة التحكم
+        adminDashboardModal.style.display = 'block';
+        displayUsers();
+        
+        alert('تم تسجيل الدخول كمشرف بنجاح');
+        return;
+    }
+    
+    // التحقق من المستخدمين العاديين
+    const usersRef = dbRef(db, 'users');
+    dbOnValue(usersRef, (snapshot) => {
+        if (snapshot.exists()) {
+            const users = snapshot.val();
+            const user = Object.values(users).find(u => u.email === email && u.password === password);
+            
+            if (user) {
+                currentUser = {
+                    email: user.email,
+                    role: user.role || 'user',
+                    subscriptionPlan: user.subscriptionPlan
                 };
+                
+                // حفظ حالة المستخدم في localStorage
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                
+                // تحديث واجهة المستخدم
+                updateUI();
+                
+                // إغلاق نافذة تسجيل الدخول
+                loginModal.style.display = 'none';
+                
                 alert('تم تسجيل الدخول بنجاح');
             } else {
-                alert('كلمة المرور غير صحيحة');
-                return;
+                alert('البريد الإلكتروني أو كلمة المرور غير صحيحة');
             }
         } else {
-            // Check if email is valid
-            if (!isValidEmail(email)) {
-                alert('البريد الإلكتروني غير صالح. يرجى إدخال بريد إلكتروني صحيح.');
-                return;
-            }
-            
-            // New user registration
-            const newUser = { 
-                email, 
-                password,
-                role: 'customer',
-                hasUsedFreePlan: false
-            };
-            registeredUsers.push(newUser);
-            saveData();
-            currentUser = { 
-                role: 'customer', 
-                email,
-                hasUsedFreePlan: false
-            };
-            alert('تم تسجيل حساب جديد بنجاح');
+            alert('البريد الإلكتروني أو كلمة المرور غير صحيحة');
         }
-    }
-
-    loginModal.style.display = 'none';
-    updateUI();
+    });
 });
 
-// Function to validate email format
-function isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+// تحديث وظيفة تحميل حالة المستخدم عند بدء التطبيق
+document.addEventListener('DOMContentLoaded', () => {
+    // محاولة تحميل حالة المستخدم من localStorage
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        updateUI();
+        
+        // إذا كان المستخدم مشرفاً، إظهار لوحة التحكم
+        if (currentUser.role === 'admin') {
+            adminDashboardModal.style.display = 'block';
+            displayUsers();
+        }
+    }
+    
+    displayProducts();
+});
+
+// تحديث وظيفة البحث عن المنتجات
+document.getElementById('mainProductSearch').addEventListener('input', function(e) {
+    const searchQuery = e.target.value.toLowerCase();
+    const productsContainer = document.getElementById('productsContainer');
+    if (!productsContainer) return;
+
+    const productCards = productsContainer.getElementsByClassName('product-card');
+    let hasVisibleProducts = false;
+
+    Array.from(productCards).forEach(card => {
+        const productName = card.querySelector('.product-name')?.textContent.toLowerCase() || '';
+        const productDescription = card.querySelector('.product-description')?.textContent.toLowerCase() || '';
+        const productCategory = card.querySelector('.product-category')?.textContent.toLowerCase() || '';
+
+        const isVisible = productName.includes(searchQuery) || 
+                        productDescription.includes(searchQuery) || 
+                        productCategory.includes(searchQuery);
+
+        card.style.display = isVisible ? '' : 'none';
+        if (isVisible) hasVisibleProducts = true;
+    });
+
+    // إظهار رسالة إذا لم يتم العثور على نتائج
+    const noResultsMessage = document.getElementById('noResultsMessage');
+    if (!hasVisibleProducts) {
+        if (!noResultsMessage) {
+            const message = document.createElement('div');
+            message.id = 'noResultsMessage';
+            message.className = 'no-products-message';
+            message.innerHTML = `
+                <i class="fas fa-search"></i>
+                <p>لم يتم العثور على منتجات مطابقة للبحث</p>
+            `;
+            productsContainer.appendChild(message);
+        }
+    } else if (noResultsMessage) {
+        noResultsMessage.remove();
+    }
+});
+
+// Toggle sidebar
+menuToggle.addEventListener('click', () => {
+    sidebar.classList.add('active');
+    overlay.classList.add('active');
+    document.body.classList.add('sidebar-open');
+    document.body.style.overflow = 'hidden';
+});
+
+// Close sidebar
+function closeSidebarMenu() {
+    sidebar.classList.remove('active');
+    overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-open');
+    document.body.style.overflow = '';
 }
 
-// تحديث نموذج إضافة المنتج
-document.getElementById('addProductForm').innerHTML = `
-    <input type="text" id="productName" placeholder="اسم المنتج" required>
-    <input type="number" id="productPrice" placeholder="السعر" required>
-    <label for="productCategory">فئة المنتج</label>
-    <select id="productCategory" aria-label="فئة المنتج" required>
-        <option value="" disabled selected>اختر فئة المنتج</option>
-        <option value="electronics">إلكترونيات</option>
-        <option value="clothing">ملابس</option>
-        <option value="home">منتجات منزلية</option>
-        <option value="beauty">مستحضرات تجميل</option>
-        <option value="sports">رياضة</option>
-        <option value="books">كتب</option>
-        <option value="toys">ألعاب</option>
-        <option value="food">طعام</option>
-        <option value="other">أخرى</option>
-    </select>
-    <textarea id="productDescription" placeholder="وصف المنتج" required></textarea>
-    <input type="tel" id="productPhone" placeholder="رقم الهاتف" required>
-    <div class="image-upload-container">
-        <label for="productImage" class="image-upload-label">
-            <i class="fas fa-cloud-upload-alt"></i>
-            <span>اختر صورة المنتج</span>
-        </label>
-        <input type="file" id="productImage" accept="image/*" required>
-        <div id="imagePreview" class="image-preview"></div>
-    </div>
-    <button type="submit" id="submitProductBtn">إضافة المنتج</button>
-`;
+closeSidebar.addEventListener('click', closeSidebarMenu);
+overlay.addEventListener('click', closeSidebarMenu);
 
-// إضافة معالجة تحميل الصورة
-document.getElementById('productImage').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        // التحقق من حجم الصورة (أقصى 5 ميجابايت)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('حجم الصورة كبير جداً. الحد الأقصى هو 5 ميجابايت');
-            this.value = '';
-            return;
-        }
-
-        // التحقق من نوع الملف
-        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!validTypes.includes(file.type)) {
-            alert('نوع الملف غير مدعوم. يرجى اختيار صورة بصيغة JPG, PNG, GIF أو WebP');
-            this.value = '';
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const preview = document.getElementById('imagePreview');
-            preview.innerHTML = `<img src="${e.target.result}" alt="معاينة الصورة">`;
-        };
-        reader.readAsDataURL(file);
-    }
+// Handle sidebar links
+sidebarLinks.forEach(link => {
+    link.addEventListener('click', () => {
+        // Remove active class from all links
+        sidebarLinks.forEach(l => l.classList.remove('active'));
+        // Add active class to clicked link
+        link.classList.add('active');
+        // Close sidebar after clicking a link
+        closeSidebarMenu();
+    });
 });
 
-// تحديث وظيفة إضافة المنتج
-document.getElementById('addProductForm').addEventListener('submit', async function(e) {
+// Connect sidebar buttons to main buttons
+sidebarAddProductBtn.addEventListener('click', () => {
+    document.getElementById('addProductBtn').click();
+});
+
+sidebarFeedbackBtn.addEventListener('click', () => {
+    document.getElementById('feedbackBtn').click();
+});
+
+sidebarLoginBtn.addEventListener('click', () => {
+    document.getElementById('loginBtn').click();
+});
+
+// Update active link based on current page
+function updateActiveLink() {
+    const currentPath = window.location.pathname;
+    const currentHash = window.location.hash;
+    
+    sidebarLinks.forEach(link => {
+        const linkHref = link.getAttribute('href');
+        if (linkHref === currentPath || (linkHref === '#' && currentPath === '/') || 
+            (linkHref === currentHash && currentHash !== '')) {
+            link.classList.add('active');
+        } else {
+            link.classList.remove('active');
+        }
+    });
+}
+
+// Call updateActiveLink on page load and when hash changes
+updateActiveLink();
+window.addEventListener('hashchange', updateActiveLink);
+
+// Initial UI update
+updateUI();
+
+// تحديث وظيفة حفظ المنتجات
+function saveProducts() {
+    const productsRef = dbRef(db, 'products');
+    dbSet(productsRef, products);
+}
+
+// تحديث وظيفة تحميل المنتجات
+function loadProducts() {
+    const productsRef = dbRef(db, 'products');
+    dbOnValue(productsRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            products = data;
+            displayProducts();
+            displayAdminProducts();
+        }
+    });
+}
+
+// تحديث وظيفة حفظ المستخدمين
+function saveUsers() {
+    const usersRef = dbRef(db, 'users');
+    dbSet(usersRef, users);
+}
+
+// تحديث وظيفة تحميل المستخدمين
+function loadUsers() {
+    const usersRef = dbRef(db, 'users');
+    dbOnValue(usersRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            users = data;
+            displayUsers();
+        }
+    });
+}
+
+// تحديث وظيفة حفظ التعليقات
+function saveFeedback() {
+    const feedbackRef = dbRef(db, 'feedback');
+    dbSet(feedbackRef, feedback);
+}
+
+// تحديث وظيفة تحميل التعليقات
+function loadFeedback() {
+    const feedbackRef = dbRef(db, 'feedback');
+    dbOnValue(feedbackRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            feedback = data;
+            displayFeedback();
+        }
+    });
+}
+
+// تحديث وظيفة إرسال التعليق
+document.getElementById('feedbackForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const submitButton = document.getElementById('submitProductBtn');
-    submitButton.disabled = true;
-    submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإضافة...';
-    
-    try {
-        // التحقق من صحة البيانات
-        const productName = document.getElementById('productName').value.trim();
-        const productPrice = document.getElementById('productPrice').value.trim();
-        const productCategory = document.getElementById('productCategory').value;
-        const productDescription = document.getElementById('productDescription').value.trim();
-        const productPhone = document.getElementById('productPhone').value.trim();
-        const imageFile = document.getElementById('productImage').files[0];
-        const remainingProducts = parseInt(document.getElementById('remainingProducts').value);
+    const subject = document.getElementById('feedbackSubject').value;
+    const message = document.getElementById('feedbackMessage').value;
 
-        if (!productName || !productPrice || !productCategory || !productDescription || !productPhone) {
-            throw new Error('يرجى ملء جميع الحقول المطلوبة');
-        }
+    // إنشاء معرف فريد للتعليق
+    const newFeedbackRef = dbPush(dbRef(db, 'feedback'));
+    const feedbackId = newFeedbackRef.key;
 
-        if (!imageFile) {
-            throw new Error('يرجى اختيار صورة للمنتج');
-        }
+    // إنشاء كائن التعليق
+    const newFeedback = {
+        id: feedbackId,
+        subject: subject,
+        message: message,
+        date: new Date().toISOString(),
+        status: 'pending'
+    };
 
-        if (remainingProducts <= 0) {
-            throw new Error('لقد وصلت إلى الحد الأقصى من المنتجات المسموح بها في هذه الخطة');
-        }
+    // حفظ التعليق في Firebase
+    dbSet(newFeedbackRef, newFeedback);
 
-        // تحميل الصورة إلى Cloudinary
-        const formData = new FormData();
-        formData.append('file', imageFile);
-        formData.append('upload_preset', 'dkvrbc30');
-        formData.append('cloud_name', 'dlrmoc6nq');
-
-        const uploadResponse = await fetch('https://api.cloudinary.com/v1_1/dlrmoc6nq/image/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json();
-            throw new Error(`فشل في تحميل الصورة: ${errorData.error?.message || 'حدث خطأ غير معروف'}`);
-        }
-
-        const uploadResult = await uploadResponse.json();
-        
-        if (!uploadResult.secure_url) {
-            throw new Error('لم يتم الحصول على رابط الصورة من الخادم');
-        }
-
-        const imageUrl = uploadResult.secure_url;
-
-        // إنشاء كائن المنتج
-        const productData = {
-            id: dbPush(dbRef(db, 'products')).key,
-            name: productName,
-            price: productPrice,
-            category: productCategory,
-            description: productDescription,
-            phone: productPhone,
-            imageUrl: imageUrl,
-            date: new Date().toISOString(),
-            status: currentUser?.role === 'admin' ? 'approved' : 'pending',
-            seller: currentUser?.email || 'غير معروف'
-        };
-
-        // حفظ المنتج في Firebase
-        await dbSet(dbRef(db, `products/${productData.id}`), productData);
-
-        // تحديث عدد المنتجات المتبقية
-        const newRemainingProducts = remainingProducts - 1;
-        document.getElementById('remainingProducts').value = newRemainingProducts;
-        
-        // تحديث زر الإضافة
-        const submitButton = document.getElementById('submitProductBtn');
-        if (newRemainingProducts > 0) {
-            submitButton.textContent = `إضافة المنتج (${newRemainingProducts} متبقي)`;
-            submitButton.disabled = false;
-        } else {
-            submitButton.textContent = 'تم الوصول إلى الحد الأقصى';
-            submitButton.disabled = true;
-        }
-
-        // إعادة تعيين النموذج
-        this.reset();
-        document.getElementById('imagePreview').innerHTML = '';
-        
-        // عرض رسالة مناسبة بناءً على دور المستخدم
-        if (currentUser?.role === 'admin') {
-            alert('تم إضافة المنتج بنجاح وتم عرضه مباشرة في القائمة الرئيسية');
-            displayProducts(); // تحديث عرض المنتجات مباشرة
-        } else {
-            alert('تم إضافة المنتج بنجاح وسيتم مراجعته من قبل المشرف قريباً');
-        }
-    } catch (error) {
-        console.error('خطأ في حفظ المنتج:', error);
-        alert(error.message || 'حدث خطأ أثناء حفظ المنتج. يرجى المحاولة مرة أخرى.');
-    } finally {
-        submitButton.disabled = false;
-        submitButton.innerHTML = 'إضافة المنتج';
-    }
+    // إغلاق النافذة المنبثقة وإعادة تعيين النموذج
+    document.getElementById('feedbackModal').style.display = 'none';
+    this.reset();
 });
 
-// تحديث وظيفة عرض المنتجات
+// وظيفة عرض المنتجات
 function displayProducts() {
     const productsContainer = document.getElementById('productsContainer');
     if (!productsContainer) {
