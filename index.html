@@ -232,7 +232,7 @@
     </div>
 
     <footer>
-        <p>جميع الحقوق محفوظة &copy; 2025 Profitez</p>
+        <p>جميع الحقوق محفوظة © 2025 Profitez</p>
     </footer>
 
     <script src="script.js"></script>
@@ -242,37 +242,59 @@
     // Import the functions you need from the SDKs you need
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-analytics.js";
-    import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+    // Import Database functions
+    import { getDatabase, ref, set, push, onValue, remove, get, update as dbUpdate } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js";
+    // Import Storage functions
     import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
-    
+    // Import Auth functions
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
     // Your web app's Firebase configuration
+    // IMPORTANT: Replace with your actual Firebase config
     const firebaseConfig = {
-        apiKey: "AIzaSyBCPYWSeQ5JnJs9yOfo2vpqNhiDpxgM-tQ",
-        authDomain: "turnkey-cooler-456322-f6.firebaseapp.com",
-        projectId: "turnkey-cooler-456322-f6",
-        storageBucket: "turnkey-cooler-456322-f6.appspot.com",
-        messagingSenderId: "634999350618",
-        appId: "1:634999350618:web:093ffbb3df59efb36fff63",
-        measurementId: "G-1SDKYMPG20",
-        databaseURL: "https://turnkey-cooler-456322-f6-default-rtdb.firebaseio.com"
-    };
+  apiKey: "AIzaSyBCPYWSeQ5JnJs9yOfo2vpqNhiDpxgM-tQ",
+  authDomain: "turnkey-cooler-456322-f6.firebaseapp.com",
+  projectId: "turnkey-cooler-456322-f6",
+  storageBucket: "turnkey-cooler-456322-f6.firebasestorage.app",
+  messagingSenderId: "634999350618",
+  appId: "1:634999350618:web:093ffbb3df59efb36fff63",
+  measurementId: "G-1SDKYMPG20"
+};
 
     // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const analytics = getAnalytics(app);
     const database = getDatabase(app);
     const storage = getStorage(app);
+    const auth = getAuth(app); // Initialize Auth
 
-    // Make database and storage available globally
+    // Make Firebase services and functions available globally (or pass them to script.js)
+    // Database
     window.db = database;
     window.dbRef = ref;
     window.dbSet = set;
     window.dbPush = push;
     window.dbOnValue = onValue;
     window.dbRemove = remove;
+    window.dbGet = get; // Add get function
+    window.dbUpdate = dbUpdate; // Add update function
+
+    // Storage
     window.storage = storage;
     window.storageRef = storageRef;
     window.uploadBytes = uploadBytes;
     window.getDownloadURL = getDownloadURL;
+
+    // Auth
+    window.auth = auth;
+    window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+    window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+    window.signOut = signOut;
+    window.onAuthStateChanged = onAuthStateChanged;
+
+    // Trigger initial auth state check in script.js
+    if (window.initializeAuthListener) {
+        window.initializeAuthListener();
+    }
 </script>
 </html> 
