@@ -470,6 +470,9 @@ function createProductCard(product) {
                  alt="${safeName}"
                  class="product-image"
                  onerror="this.onerror=null; this.src='https://via.placeholder.com/300x200?text=Image+Error';">
+            <button class="preview-btn" onclick="openImageViewer(['${imageUrl}'], '${safeName}')" title="معاينة الصورة">
+                <i class="fas fa-search-plus"></i>
+            </button>
         </div>
         <div class="product-details">
             <div class="product-header">

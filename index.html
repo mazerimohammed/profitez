@@ -231,12 +231,36 @@
         </div>
     </div>
 
+    <!-- Image Viewer Modal -->
+    <div id="imageViewerModal" class="image-viewer-modal">
+        <div class="image-viewer-content">
+            <div class="image-viewer-header">
+                <h2 id="productName"></h2>
+                <span class="image-viewer-close">&times;</span>
+            </div>
+            <div class="viewer-controls">
+                <button id="prevImage" class="viewer-btn" title="Previous Image">❮</button>
+                <div class="image-container">
+                    <img id="viewerImage" src="" alt="Product Image">
+                </div>
+                <button id="nextImage" class="viewer-btn" title="Next Image">❯</button>
+            </div>
+            <div class="viewer-controls">
+                <button id="zoomIn" class="viewer-btn" title="Zoom In">+</button>
+                <button id="zoomOut" class="viewer-btn" title="Zoom Out">-</button>
+                <button id="resetZoom" class="viewer-btn" title="Reset Zoom">Reset</button>
+            </div>
+            <div id="thumbnailsContainer" class="image-thumbnails"></div>
+        </div>
+    </div>
+
     <footer>
         <p>جميع الحقوق محفوظة © 2025 Profitez</p>
     </footer>
 
     <script src="script.js"></script>
     <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+    <script src="imageViewer.js"></script>
 </body>
 <script type="module">
     // Import the functions you need from the SDKs you need
