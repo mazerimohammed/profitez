@@ -68,6 +68,7 @@ function mapAuthError(errorCode) {
         case 'auth/weak-password': return 'كلمة المرور ضعيفة جداً (يجب أن تكون 6 أحرف على الأقل).';
         case 'auth/operation-not-allowed': return 'تسجيل الدخول بكلمة المرور غير مفعل.';
         case 'auth/requires-recent-login': return 'تتطلب هذه العملية إعادة تسجيل الدخول مؤخراً.';
+        case 'auth/invalid-credential': return 'بيانات الاعتماد غير صالحة. يرجى التحقق من البريد الإلكتروني وكلمة المرور.';
         default: return 'حدث خطأ غير متوقع. (' + errorCode + ')';
     }
 }
@@ -81,9 +82,8 @@ function isValidEmail(email) {
 // Function to get category name (Keep existing)
 function getCategoryName(category) {
     const categories = {
-        'electronics': 'إلكترونيات', 'clothing': 'ملابس', 'home': 'منتجات منزلية',
-        'beauty': 'مستحضرات تجميل', 'sports': 'رياضة', 'books': 'كتب',
-        'toys': 'ألعاب', 'food': 'طعام', 'other': 'أخرى'
+        'new-clothing': 'ملابس جديدة',
+        'used-clothing': 'ملابس مستعملة'
     };
     return categories[category] || category;
 }
@@ -109,7 +109,7 @@ window.initializeAuthListener = () => {
         setTimeout(window.initializeAuthListener, 500);
         return;
     }
-
+    
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             // User is signed in
@@ -150,11 +150,11 @@ window.initializeAuthListener = () => {
                 console.log("Current user set:", currentUser);
 
                 // Admin specific actions
-                if (currentUser.role === 'admin') {
+    if (currentUser.role === 'admin') {
                    updateAdminNotification(); // Check for pending items
                    // Ensure admin tab is accessible in sidebar
                    if (sidebarAdminBtn) sidebarAdminBtn.style.display = 'block';
-                } else {
+    } else {
                    if (sidebarAdminBtn) sidebarAdminBtn.style.display = 'none';
                 }
                 displaySubscriptionStatus(); // Show subscription status for customer
@@ -172,7 +172,7 @@ window.initializeAuthListener = () => {
                 alert("حدث خطأ في تحميل بيانات المستخدم. قد تكون بعض الميزات غير متاحة.");
             }
 
-        } else {
+    } else {
             // User is signed out
             console.log("Auth State Changed: User signed out");
             currentUser = null;
@@ -194,63 +194,98 @@ if (window.auth) {
 // Login Form Submission Handler
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value.trim();
     const submitButton = loginForm.querySelector('button[type="submit"]');
     submitButton.disabled = true;
     submitButton.textContent = 'جاري الدخول...';
 
-    try {
-        // Try to sign in
-        console.log(`Attempting login for: ${email}`);
-        await signInWithEmailAndPassword(auth, email, password);
-        console.log(`Login successful for: ${email}`);
-        // onAuthStateChanged will handle UI updates and role fetching
-        loginModal.style.display = 'none';
-        loginForm.reset();
+    // Basic validation
+    if (!email || !password) {
+        alert('يرجى إدخال البريد الإلكتروني وكلمة المرور.');
+        submitButton.disabled = false;
+        submitButton.textContent = 'تسجيل الدخول';
+        return;
+    }
 
+    // Email format validation
+    if (!isValidEmail(email)) {
+        alert('يرجى إدخال بريد إلكتروني صحيح.');
+        submitButton.disabled = false;
+        submitButton.textContent = 'تسجيل الدخول';
+        return;
+    }
+
+    try {
+        // First check if user exists in database
+        const usersRef = dbRef(db, 'users');
+        const snapshot = await dbGet(usersRef);
+        let userExists = false;
+
+        if (snapshot.exists()) {
+            const users = snapshot.val();
+            for (const [uid, userData] of Object.entries(users)) {
+                if (userData.email === email) {
+                    userExists = true;
+                    break;
+                }
+            }
+        }
+
+        if (userExists) {
+            // User exists in database, try to sign in
+            console.log(`Attempting login for existing user: ${email}`);
+            await signInWithEmailAndPassword(auth, email, password);
+            console.log(`Login successful for: ${email}`);
+            loginModal.style.display = 'none';
+            loginForm.reset();
+        } else {
+            // User doesn't exist, offer to create new account
+            if (confirm('هذا البريد الإلكتروني غير مسجل. هل تريد إنشاء حساب جديد؟')) {
+                try {
+                    console.log(`Attempting registration for: ${email}`);
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    console.log(`Registration successful for: ${email}, UID: ${userCredential.user.uid}`);
+
+                    // Set default role and data in Realtime Database
+                    const userRef = dbRef(db, `users/${userCredential.user.uid}`);
+                    await dbSet(userRef, {
+                        email: email,
+                        role: 'customer',
+                        date: new Date().toISOString(),
+                        hasUsedFreePlan: false
+                    });
+                    console.log(`User profile created in DB for UID: ${userCredential.user.uid}`);
+
+                    alert('تم إنشاء الحساب وتسجيل الدخول بنجاح!');
+                    loginModal.style.display = 'none';
+                    loginForm.reset();
+                } catch (signupError) {
+                    console.error("Signup Error:", signupError.code, signupError.message);
+                    if (signupError.code === 'auth/email-already-in-use') {
+                        // If email exists in auth but not in database, try to sign in
+                        try {
+                            await signInWithEmailAndPassword(auth, email, password);
+                            console.log(`Login successful after signup error: ${email}`);
+                            loginModal.style.display = 'none';
+                            loginForm.reset();
+                        } catch (loginError) {
+                            alert('فشل تسجيل الدخول: ' + mapAuthError(loginError.code));
+                        }
+                    } else {
+                        alert('فشل إنشاء الحساب: ' + mapAuthError(signupError.code));
+                    }
+                }
+            } else {
+                alert('تم إلغاء عملية إنشاء الحساب.');
+            }
+        }
     } catch (error) {
         console.error("Login Error:", error.code, error.message);
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-            // Handle both user-not-found and generic invalid-credential (which often means user not found or wrong password)
-            // Ask to register only if it's likely a new user
-            if (confirm('الحساب غير موجود أو كلمة المرور خاطئة. هل تريد إنشاء حساب جديد بهذا البريد وكلمة المرور؟ (إذا كان الحساب موجوداً، تجاهل وأعد المحاولة بكلمة المرور الصحيحة)')) {
-                 try {
-                     console.log(`Attempting registration for: ${email}`);
-                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                     console.log(`Registration successful for: ${email}, UID: ${userCredential.user.uid}`);
-
-                     // Set default role and data in Realtime Database immediately after creation
-                     const userRef = dbRef(db, `users/${userCredential.user.uid}`);
-                     await dbSet(userRef, {
-                         email: email,
-                         role: 'customer', // Default role
-                         date: new Date().toISOString(),
-                         hasUsedFreePlan: false // Initialize free plan status
-                     });
-                     console.log(`User profile created in DB for UID: ${userCredential.user.uid}`);
-
-                     alert('تم إنشاء الحساب وتسجيل الدخول بنجاح!');
-                     loginModal.style.display = 'none';
-                     loginForm.reset();
-                     // onAuthStateChanged will handle the rest (setting currentUser, UI update)
-                 } catch (signupError) {
-                     console.error("Signup Error:", signupError.code, signupError.message);
-                     alert('فشل إنشاء الحساب: ' + mapAuthError(signupError.code));
-                 }
-            } else {
-                 alert('تسجيل الدخول فشل. يرجى التحقق من البريد الإلكتروني وكلمة المرور أو إنشاء حساب جديد.');
-            }
-        // } else if (error.code === 'auth/wrong-password') { // Covered by invalid-credential often
-        //     alert('كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.');
-        } else if (error.code === 'auth/invalid-email') {
-            alert('البريد الإلكتروني غير صالح.');
-        } else {
-            alert('فشل تسجيل الدخول: ' + mapAuthError(error.code));
-        }
+        alert('فشل تسجيل الدخول: ' + mapAuthError(error.code));
     } finally {
-         submitButton.disabled = false;
-         submitButton.textContent = 'تسجيل الدخول';
+        submitButton.disabled = false;
+        submitButton.textContent = 'تسجيل الدخول';
     }
 });
 
@@ -364,7 +399,7 @@ sidebarLinks.forEach(link => {
              }
         } else if (link.id && link.id.includes('Btn')) {
             // Handle button-like links (already handled below)
-        } else {
+            } else {
              // Handle other links (e.g., 'الرئيسية')
              if (targetId === '#') { // Assuming '#' is home
                  e.preventDefault();
@@ -473,7 +508,7 @@ function createProductCard(product) {
             <button class="preview-btn" onclick="openImageViewer(['${imageUrl}'], '${safeName}')" title="معاينة الصورة">
                 <i class="fas fa-search-plus"></i>
             </button>
-        </div>
+    </div>
         <div class="product-details">
             <div class="product-header">
                 <h3 class="product-name">${safeName}</h3>
@@ -521,8 +556,8 @@ addProductBtn.addEventListener('click', () => {
     if (!currentUser) {
         alert('يرجى تسجيل الدخول أولاً لإضافة منتج.');
         loginModal.style.display = 'block';
-        return;
-    }
+            return;
+        }
 
     if (currentUser.role === 'admin') {
         // Admin can add directly, no subscription needed
@@ -588,11 +623,11 @@ addProductForm.addEventListener('submit', async (e) => {
         alert("خطأ: المستخدم غير مسجل الدخول.");
         return;
     }
-
+    
     const submitButton = document.getElementById('submitProductBtn');
     submitButton.disabled = true;
     submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإضافة...';
-
+    
     try {
         const productName = document.getElementById('productName').value.trim();
         const productPrice = document.getElementById('productPrice').value.trim();
@@ -642,23 +677,23 @@ addProductForm.addEventListener('submit', async (e) => {
              if (!validTypes.includes(imageFile.type)) throw new Error('نوع الملف غير مدعوم (JPG, PNG, GIF, WebP).');
 
             // Using Cloudinary (ensure your cloud_name and upload_preset are correct)
-            const formData = new FormData();
-            formData.append('file', imageFile);
+        const formData = new FormData();
+        formData.append('file', imageFile);
             formData.append('upload_preset', 'dkvrbc30'); // Replace with your Cloudinary upload preset
             formData.append('cloud_name', 'dlrmoc6nq'); // Replace with your Cloudinary cloud name
 
             console.log("Uploading image to Cloudinary...");
             const uploadResponse = await fetch('https://api.cloudinary.com/v1_1/dlrmoc6nq/image/upload', { // Replace cloud name here too
-                method: 'POST',
-                body: formData
-            });
+            method: 'POST',
+            body: formData
+        });
 
-            if (!uploadResponse.ok) {
-                const errorData = await uploadResponse.json();
+        if (!uploadResponse.ok) {
+            const errorData = await uploadResponse.json();
                 throw new Error(`فشل تحميل الصورة: ${errorData.error?.message || 'خطأ غير معروف'}`);
-            }
-            const uploadResult = await uploadResponse.json();
-            if (!uploadResult.secure_url) {
+        }
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResult.secure_url) {
                 throw new Error('لم يتم الحصول على رابط الصورة من Cloudinary.');
             }
             imageUrl = uploadResult.secure_url;
@@ -729,7 +764,7 @@ addProductForm.addEventListener('submit', async (e) => {
         // Re-enable button unless limit was reached for non-admin
         const remainingVal = document.getElementById('remainingProducts')?.value;
         if (currentUser?.role === 'admin' || (remainingVal && parseInt(remainingVal, 10) > 0) ) {
-             submitButton.disabled = false;
+        submitButton.disabled = false;
              if(currentUser?.role !== 'admin' && remainingVal) {
                   submitButton.textContent = `إضافة المنتج (${remainingVal} متبقي)`;
              } else {
@@ -846,7 +881,7 @@ function updateSubscriptionPlansDisplay(currentProductCount = 0) {
                      document.getElementById('selectedPlanLimit').textContent = selectedPlan.limit;
                      document.getElementById('selectedPlanPrice').textContent = selectedPlan.price;
                      paymentInstructionsModal.style.display = 'block';
-                 } else {
+                } else {
                      // Handle free plan selection (or re-selection)
                      updateUserSubscription(selectedPlan);
                  }
@@ -927,8 +962,8 @@ function displaySubscriptionStatus() {
             // Now call the function again to populate it
             setTimeout(displaySubscriptionStatus, 0); // Re-call in next tick
         }
-        return;
-    }
+                return;
+            }
 
     statusContainer.innerHTML = ''; // Clear previous status
 
@@ -1026,7 +1061,7 @@ feedbackForm.addEventListener('submit', async (e) => {
         // Optionally notify admin
         updateAdminNotification();
 
-    } catch (error) {
+        } catch (error) {
         console.error("Error submitting feedback:", error);
         alert("حدث خطأ أثناء إرسال التعليق.");
     } finally {
@@ -1066,7 +1101,7 @@ function displayUsers(searchTerm = '') {
             usersList.innerHTML = '<p>لا يوجد مستخدمون مسجلون.</p>';
             return;
         }
-
+        
         const data = snapshot.val();
         let usersFound = false;
         Object.entries(data).forEach(([uid, user]) => {
@@ -1077,31 +1112,31 @@ function displayUsers(searchTerm = '') {
                  uid.toLowerCase().includes(lowerSearchTerm))
              {
                  usersFound = true;
-                 const userCard = document.createElement('div');
-                 userCard.className = 'user-card';
+                const userCard = document.createElement('div');
+                userCard.className = 'user-card';
                  userCard.dataset.userId = uid;
 
                  const userPlan = user.subscriptionPlan || { name: 'مجاني', limit: '2' };
                  const registrationDate = user.date ? new Date(user.date).toLocaleDateString('ar-EG') : 'غير معروف';
 
-                 userCard.innerHTML = `
+                userCard.innerHTML = `
                      <h3>${user.email || 'لا يوجد بريد'} <span style="font-size: 0.7em; color: #666;">(${uid})</span></h3>
-                     <div class="user-info">
-                         <p>الدور: ${user.role === 'admin' ? 'مشرف' : 'زبون'}</p>
+                    <div class="user-info">
+                        <p>الدور: ${user.role === 'admin' ? 'مشرف' : 'زبون'}</p>
                          <p>تاريخ التسجيل: ${registrationDate}</p>
                          <p>خطة الاشتراك: ${userPlan.name} (حد: ${userPlan.limit})</p>
                          <p>استخدم المجاني: ${user.hasUsedFreePlan ? 'نعم' : 'لا'}</p>
-                     </div>
-                     <div class="user-actions">
-                         ${user.role !== 'admin' ? `
+                    </div>
+                    <div class="user-actions">
+                        ${user.role !== 'admin' ? `
                              <button onclick="makeAdmin('${uid}')" class="action-btn promote-admin"><i class="fas fa-user-shield"></i> ترقية لمشرف</button>
                          ` : `
                              <button onclick="makeCustomer('${uid}')" class="action-btn demote-admin"><i class="fas fa-user"></i> إزالة صلاحية المشرف</button>
                          `}
                          <button onclick="deleteUser('${uid}')" class="action-btn delete-user"><i class="fas fa-trash"></i> حذف بيانات المستخدم</button>
-                     </div>
-                 `;
-                 usersList.appendChild(userCard);
+                    </div>
+                `;
+                usersList.appendChild(userCard);
              }
         });
 
@@ -1129,18 +1164,18 @@ function displayAdminProducts(searchTerm = '') {
              updateAdminNotification(); // Update notification (will show 0)
             return;
         }
-
+        
         const data = snapshot.val();
         let productsFound = false;
         const productsArray = Object.entries(data)
              .map(([id, product]) => ({ id, ...product }))
              .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort newest first
-
-        productsArray.forEach(product => {
-             if (product.status === 'pending') {
-                 pendingProductsCount++;
-             }
-
+            
+            productsArray.forEach(product => {
+                if (product.status === 'pending') {
+                    pendingProductsCount++;
+                }
+                
              // Filter based on search term (name, description, category, seller email)
              const lowerSearchTerm = searchTerm.toLowerCase();
              const productName = product.name ? product.name.toLowerCase() : '';
@@ -1157,8 +1192,8 @@ function displayAdminProducts(searchTerm = '') {
                  )
              {
                  productsFound = true;
-                 const productCard = document.createElement('div');
-                 productCard.className = 'admin-product-card';
+                const productCard = document.createElement('div');
+                productCard.className = 'admin-product-card';
                  productCard.dataset.productId = product.id;
 
                  let imageUrl = product.imageUrl || 'https://via.placeholder.com/150x100?text=No+Image';
@@ -1173,39 +1208,39 @@ function displayAdminProducts(searchTerm = '') {
                  const safeDate = product.date ? new Date(product.date).toLocaleDateString('ar-EG') : 'غير محدد';
                  const safeSeller = product.seller ? String(product.seller).replace(/</g, "<") : 'غير معروف';
                  const statusText = getStatusText(product.status);
-
-                 const cardContent = `
+                
+                const cardContent = `
                      <div class="product-image-container" style="flex-basis: 150px; height: 100px;">
                          <img src="${imageUrl}"
                               alt="${safeName}"
-                              class="product-image"
+                             class="product-image" 
                               onerror="this.onerror=null; this.src='https://via.placeholder.com/150x100?text=Error';"
                               style="width: 100%; height: 100%; object-fit: cover;">
-                     </div>
+                    </div>
                      <div class="product-details" style="flex-grow: 1; padding-left: 15px;">
-                         <div class="product-header">
+                        <div class="product-header">
                              <h3 class="product-name" style="font-size: 1.1rem;">${safeName}</h3>
                              <div class="product-price">${safePrice} دج</div>
-                         </div>
+                        </div>
                          <div style="font-size: 0.85rem; color: #555; margin-bottom: 5px;">
                               <span class="product-category"><i class="fas fa-tag"></i> ${safeCategory}</span> |
                               <span class="product-seller"><i class="fas fa-user"></i> ${safeSeller}</span> |
                               <span class="product-date"><i class="far fa-calendar-alt"></i> ${safeDate}</span>
-                         </div>
+                        </div>
                          <div class="product-description" style="font-size: 0.9rem; margin-bottom: 10px;">${safeDescription}</div>
-                         <div class="product-status">
+                            <div class="product-status">
                              الحالة: <span class="status-${product.status}" style="font-weight: bold;">${statusText}</span>
                               | هاتف: <span class="product-contact">${safePhone}</span>
-                         </div>
-                         <div class="admin-actions">
-                             ${product.status === 'pending' ? `
+                        </div>
+                        <div class="admin-actions">
+                            ${product.status === 'pending' ? `
                                  <button onclick="updateProductStatus('${product.id}', 'approved')" class="action-btn approve-btn">
-                                     <i class="fas fa-check"></i> اعتماد
-                                 </button>
+                                    <i class="fas fa-check"></i> اعتماد
+                                </button>
                                  <button onclick="updateProductStatus('${product.id}', 'rejected')" class="action-btn reject-btn">
-                                     <i class="fas fa-times"></i> رفض
-                                 </button>
-                             ` : ''}
+                                    <i class="fas fa-times"></i> رفض
+                                </button>
+                            ` : ''}
                               ${product.status === 'rejected' ? `
                                  <button onclick="updateProductStatus('${product.id}', 'approved')" class="action-btn approve-btn">
                                      <i class="fas fa-check"></i> اعتماد (بعد الرفض)
@@ -1213,13 +1248,13 @@ function displayAdminProducts(searchTerm = '') {
                              ` : ''}
                              <button onclick="deleteProduct('${product.id}')" class="action-btn delete-btn">
                                  <i class="fas fa-trash"></i> حذف نهائي
-                             </button>
-                         </div>
-                     </div>
-                 `;
-                 productCard.innerHTML = cardContent;
+                            </button>
+                        </div>
+                    </div>
+                `;
+                productCard.innerHTML = cardContent;
                  productCard.style.display = 'flex'; // Use flex for better layout
-                 adminProductsList.appendChild(productCard);
+                adminProductsList.appendChild(productCard);
              }
         });
 
@@ -1248,14 +1283,14 @@ function displayFeedbacks(searchTerm = '') {
             feedbackList.innerHTML = '<p>لا توجد تعليقات.</p>';
             return;
         }
-
+        
         const data = snapshot.val();
          let feedbackFound = false;
         const feedbackArray = Object.entries(data)
              .map(([id, feedback]) => ({ id, ...feedback }))
              .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort newest first
-
-        feedbackArray.forEach(feedback => {
+            
+            feedbackArray.forEach(feedback => {
              // Filter based on search term (subject, message, user email)
              const lowerSearchTerm = searchTerm.toLowerCase();
              const subject = feedback.subject ? feedback.subject.toLowerCase() : '';
@@ -1270,8 +1305,8 @@ function displayFeedbacks(searchTerm = '') {
                  )
              {
                  feedbackFound = true;
-                 const feedbackCard = document.createElement('div');
-                 feedbackCard.className = 'feedback-card';
+                const feedbackCard = document.createElement('div');
+                feedbackCard.className = 'feedback-card';
                  feedbackCard.dataset.feedbackId = feedback.id;
 
                  const safeSubject = feedback.subject ? String(feedback.subject).replace(/</g, "<") : 'بدون موضوع';
@@ -1280,28 +1315,28 @@ function displayFeedbacks(searchTerm = '') {
                  const safeDate = feedback.date ? new Date(feedback.date).toLocaleString('ar-EG') : 'غير محدد';
                  const statusText = getStatusText(feedback.status);
 
-                 feedbackCard.innerHTML = `
+                feedbackCard.innerHTML = `
                      <h3>${safeSubject}</h3>
-                     <div class="feedback-info">
+                    <div class="feedback-info">
                          <span>من: ${safeUserEmail}</span>
                          <span>التاريخ: ${safeDate}</span>
                          <span>الحالة: <strong class="status-${feedback.status}">${statusText}</strong></span>
-                     </div>
-                     <div class="feedback-message">
+                    </div>
+                    <div class="feedback-message">
                          ${safeMessage}
-                     </div>
-                     <div class="feedback-actions">
-                         ${feedback.status === 'pending' ? `
+                    </div>
+                    <div class="feedback-actions">
+                        ${feedback.status === 'pending' ? `
                              <button onclick="updateFeedbackStatus('${feedback.id}', 'resolved')" class="action-btn resolve-feedback"><i class="fas fa-check-circle"></i> تم الحل</button>
                              <button onclick="updateFeedbackStatus('${feedback.id}', 'rejected')" class="action-btn reject-feedback"><i class="fas fa-times-circle"></i> رفض</button>
-                         ` : ''}
+                        ` : ''}
                          ${feedback.status !== 'pending' ? `
                              <button onclick="updateFeedbackStatus('${feedback.id}', 'pending')" class="action-btn reopen-feedback"><i class="fas fa-undo"></i> إعادة فتح (تعيين كـ قيد الانتظار)</button>
                          ` : ''}
                          <button onclick="deleteFeedback('${feedback.id}')" class="action-btn delete-feedback"><i class="fas fa-trash"></i> حذف التعليق</button>
-                     </div>
-                 `;
-                 feedbackList.appendChild(feedbackCard);
+                    </div>
+                `;
+                feedbackList.appendChild(feedbackCard);
              }
         });
          if (!feedbackFound) {
@@ -1416,7 +1451,7 @@ async function deleteUser(userId) {
                 if (Object.keys(productUpdates).length > 0) {
                     await dbUpdate(productsRef, productUpdates);
                      console.log("Deleted user's products.");
-                } else {
+        } else {
                     console.log("No products found for user to delete.");
                 }
             }
@@ -1617,7 +1652,7 @@ function updateAdminNotification() {
                  });
              }
 
-             const feedbackRef = dbRef(db, 'feedback');
+    const feedbackRef = dbRef(db, 'feedback');
              const feedbackSnapshot = await dbGet(feedbackRef);
              let fCount = 0;
               if (feedbackSnapshot.exists()) {
@@ -1732,7 +1767,7 @@ feedbackSearch.addEventListener('input', (e) => displayFeedbacks(e.target.value.
 document.addEventListener('DOMContentLoaded', () => {
     // Initial display calls are now mostly handled by onAuthStateChanged
     // But we can call displayProducts initially to show something while auth loads
-     displayProducts();
+    displayProducts();
     // Update active link might be needed here or after auth loads
     // updateActiveLink();
 });

@@ -62,14 +62,131 @@ nav {
 }
 
 .logo {
+    display: flex;
+    align-items: center;
+    gap: 20px;
     font-size: 2rem;
-    font-weight: bold;
+    font-weight: 800;
     color: var(--primary-color);
-    letter-spacing: 1px;
-    background: var(--gradient);
+    text-decoration: none;
+    transition: var(--transition);
+    padding: 10px;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.logo span {
+    position: relative;
+    padding: 8px 15px;
+    background: linear-gradient(135deg, #4CAF50, #2196F3);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    background-clip: text;
+    border-radius: 8px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logo-design {
+    display: flex;
+    gap: 15px;
+    position: relative;
+}
+
+.icon-container {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.icon-container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.icon-container i {
+    font-size: 1.2rem;
+    z-index: 2;
+    transition: all 0.3s ease;
+}
+
+.icon-container:nth-child(1) i {
+    color: #4CAF50;
+}
+
+.icon-container:nth-child(2) i {
+    color: #2196F3;
+}
+
+.icon-container:nth-child(3) i {
+    color: #FF9800;
+}
+
+.pulse-effect {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: inherit;
+    opacity: 0;
+    animation: pulse 2s infinite;
+}
+
+.icon-container:nth-child(1) .pulse-effect {
+    animation-delay: 0s;
+    background: rgba(76, 175, 80, 0.2);
+}
+
+.icon-container:nth-child(2) .pulse-effect {
+    animation-delay: 0.5s;
+    background: rgba(33, 150, 243, 0.2);
+}
+
+.icon-container:nth-child(3) .pulse-effect {
+    animation-delay: 1s;
+    background: rgba(255, 152, 0, 0.2);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
+}
+
+.logo:hover .icon-container {
+    transform: scale(1.1);
+}
+
+@media (max-width: 768px) {
+    .logo {
+        font-size: 1.6rem;
+        gap: 15px;
+    }
+    
+    .icon-container {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .icon-container i {
+        font-size: 1rem;
+    }
 }
 
 .nav-links a {
@@ -1993,310 +2110,6 @@ footer p {
     
     .product-phone, .product-date {
         font-size: 0.8rem;
-    }
-}
-
-@media (max-height: 500px) and (orientation: landscape) {
-    .admin-dashboard {
-        max-height: 95vh !important;
-    }
-
-    .users-list, .products-list, .feedback-list {
-        max-height: 50vh !important;
-    }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
-    .products-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .subscription-plans {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
-    .products-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-    
-    .subscription-plans {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (min-width: 1600px) {
-    .container {
-        max-width: 1400px;
-        margin: 0 auto;
-    }
-    
-    .products-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    
-    .subscription-plans {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .admin-dashboard {
-        width: 95% !important;
-        max-width: 95% !important;
-        margin: 10px auto !important;
-        padding: 10px !important;
-    }
-
-    .admin-tabs {
-        flex-direction: column !important;
-        gap: 5px !important;
-    }
-
-    .tab-button {
-        width: 100% !important;
-        margin: 5px 0 !important;
-        padding: 10px !important;
-        font-size: 14px !important;
-    }
-
-    .tab-content {
-        padding: 10px !important;
-    }
-
-    .search-container {
-        margin: 10px 0 !important;
-    }
-
-    .search-container input {
-        width: 100% !important;
-        padding: 8px !important;
-        font-size: 14px !important;
-    }
-
-    .users-list, .products-list, .feedback-list {
-        max-height: 60vh !important;
-        padding: 5px !important;
-    }
-
-    .user-card, .admin-product-card, .feedback-card {
-        padding: 10px !important;
-        margin: 5px 0 !important;
-    }
-
-    .user-actions, .product-actions, .feedback-actions {
-        flex-direction: column !important;
-        gap: 5px !important;
-    }
-
-    .user-actions button, .product-actions button, .feedback-actions button {
-        width: 100% !important;
-        margin: 5px 0 !important;
-        padding: 8px !important;
-        font-size: 12px !important;
-    }
-
-    .modal-content {
-        max-height: 90vh !important;
-        overflow-y: auto !important;
-    }
-
-    .close {
-        font-size: 24px !important;
-        padding: 5px !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .admin-dashboard {
-        width: 100% !important;
-        height: 100% !important;
-        margin: 0 !important;
-        border-radius: 0 !important;
-    }
-
-    .modal-content {
-        max-height: 100vh !important;
-        border-radius: 0 !important;
-    }
-
-    .admin-tabs {
-        position: sticky !important;
-        top: 0 !important;
-        background: #fff !important;
-        z-index: 1000 !important;
-        padding: 5px 0 !important;
-    }
-
-    .tab-button {
-        font-size: 12px !important;
-        padding: 8px !important;
-    }
-
-    .user-info, .product-info {
-        font-size: 12px !important;
-    }
-
-    .user-products h4 {
-        font-size: 14px !important;
-    }
-
-    .user-product-item {
-        padding: 5px !important;
-        font-size: 12px !important;
-    }
-}
-
-@media (max-height: 500px) and (orientation: landscape) {
-    .admin-dashboard {
-        max-height: 95vh !important;
-    }
-
-    .users-list, .products-list, .feedback-list {
-        max-height: 50vh !important;
-    }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
-    .products-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .subscription-plans {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
-    .products-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-    
-    .subscription-plans {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (min-width: 1600px) {
-    .container {
-        max-width: 1400px;
-        margin: 0 auto;
-    }
-    
-    .products-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-    
-    .subscription-plans {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .admin-dashboard {
-        width: 95% !important;
-        max-width: 95% !important;
-        margin: 10px auto !important;
-        padding: 10px !important;
-    }
-
-    .admin-tabs {
-        flex-direction: column !important;
-        gap: 5px !important;
-    }
-
-    .tab-button {
-        width: 100% !important;
-        margin: 5px 0 !important;
-        padding: 10px !important;
-        font-size: 14px !important;
-    }
-
-    .tab-content {
-        padding: 10px !important;
-    }
-
-    .search-container {
-        margin: 10px 0 !important;
-    }
-
-    .search-container input {
-        width: 100% !important;
-        padding: 8px !important;
-        font-size: 14px !important;
-    }
-
-    .users-list, .products-list, .feedback-list {
-        max-height: 60vh !important;
-        padding: 5px !important;
-    }
-
-    .user-card, .admin-product-card, .feedback-card {
-        padding: 10px !important;
-        margin: 5px 0 !important;
-    }
-
-    .user-actions, .product-actions, .feedback-actions {
-        flex-direction: column !important;
-        gap: 5px !important;
-    }
-
-    .user-actions button, .product-actions button, .feedback-actions button {
-        width: 100% !important;
-        margin: 5px 0 !important;
-        padding: 8px !important;
-        font-size: 12px !important;
-    }
-
-    .modal-content {
-        max-height: 90vh !important;
-        overflow-y: auto !important;
-    }
-
-    .close {
-        font-size: 24px !important;
-        padding: 5px !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .admin-dashboard {
-        width: 100% !important;
-        height: 100% !important;
-        margin: 0 !important;
-        border-radius: 0 !important;
-    }
-
-    .modal-content {
-        max-height: 100vh !important;
-        border-radius: 0 !important;
-    }
-
-    .admin-tabs {
-        position: sticky !important;
-        top: 0 !important;
-        background: #fff !important;
-        z-index: 1000 !important;
-        padding: 5px 0 !important;
-    }
-
-    .tab-button {
-        font-size: 12px !important;
-        padding: 8px !important;
-    }
-
-    .user-info, .product-info {
-        font-size: 12px !important;
-    }
-
-    .user-products h4 {
-        font-size: 14px !important;
-    }
-
-    .user-product-item {
-        padding: 5px !important;
-        font-size: 12px !important;
     }
 }
 
